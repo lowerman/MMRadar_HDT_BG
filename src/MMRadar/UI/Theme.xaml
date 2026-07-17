@@ -1,0 +1,69 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Light frosted-glass palette: a ~70% translucent neutral graphite the game
+         shows through, soft gold as the single accent, colors as tints not blocks. -->
+    <SolidColorBrush x:Key="PanelBackground" Color="#B317181B"/>
+    <SolidColorBrush x:Key="PanelBorder" Color="#24FFFFFF"/>
+    <SolidColorBrush x:Key="TextPrimary" Color="#FFF2F4F6"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#FFAAB0B7"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#FF787E85"/>
+    <SolidColorBrush x:Key="Accent" Color="#FFE6C377"/>
+    <SolidColorBrush x:Key="Gold" Color="#FFE6C377"/>
+    <SolidColorBrush x:Key="LiveRed" Color="#FFFF5C5C"/>
+    <SolidColorBrush x:Key="PositiveGreen" Color="#FF3DDC97"/>
+    <SolidColorBrush x:Key="NegativeRed" Color="#FFF87171"/>
+    <SolidColorBrush x:Key="ChipBackground" Color="#1CFFFFFF"/>
+    <SolidColorBrush x:Key="RowHover" Color="#12FFFFFF"/>
+    <SolidColorBrush x:Key="DividerBrush" Color="#12FFFFFF"/>
+    <SolidColorBrush x:Key="SubtleFill" Color="#0AFFFFFF"/>
+
+    <!-- Small icon button (close / collapse) -->
+    <Style x:Key="IconButton" TargetType="Button">
+        <Setter Property="Width" Value="18"/>
+        <Setter Property="Height" Value="18"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="#26FFFFFF"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Invisible-until-hover row button -->
+    <Style x:Key="RowButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="6" Margin="4,0">
+                        <ContentPresenter/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{DynamicResource RowHover}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>
