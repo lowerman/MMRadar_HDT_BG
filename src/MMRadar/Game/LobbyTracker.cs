@@ -36,6 +36,14 @@ namespace MMRadar.Game
         /// </summary>
         private string _consumedGameUuid;
 
+        /// <summary>
+        /// Roster of the last lobby resolved via BattlegroundsLobbyInfo, kept so that a
+        /// reconnect into the SAME game (same uuid, which is otherwise treated as stale)
+        /// can restore the full player list instead of limping on a partial Power.log.
+        /// </summary>
+        private string _lastLobbyUuid;
+        private List<LobbyPlayerInfo> _lastLobbyPlayers;
+
         public void Reset()
         {
             _powerLogIndex = 0;
@@ -101,9 +109,14 @@ namespace MMRadar.Game
             if (lobbyPlayers == null || lobbyPlayers.Count < 8)
                 return null;
 
-            // Guard against HDT's watcher still serving the previous game's lobby.
+            // Guard against HDT's watcher still serving the previous game's lobby —
+            // but a reconnect into the SAME game restores the remembered roster.
             if (lobbyInfo.GameUuid != null && lobbyInfo.GameUuid == _consumedGameUuid)
+            {
+                if (lobbyInfo.GameUuid == _lastLobbyUuid && _lastLobbyPlayers != null)
+                    return _lastLobbyPlayers.Select(CopyPlayer).ToList();
                 return null;
+            }
 
             var result = new List<LobbyPlayerInfo>();
             foreach (var p in lobbyPlayers)
@@ -125,8 +138,18 @@ namespace MMRadar.Game
             if (result.Count == 0)
                 return null;
             _consumedGameUuid = lobbyInfo.GameUuid;
+            _lastLobbyUuid = lobbyInfo.GameUuid;
+            _lastLobbyPlayers = result.Select(CopyPlayer).ToList();
             return result;
         }
+
+        private static LobbyPlayerInfo CopyPlayer(LobbyPlayerInfo p) => new LobbyPlayerInfo
+        {
+            Name = p.Name,
+            PlayerId = p.PlayerId,
+            HeroCardId = p.HeroCardId,
+            IsLocalPlayer = p.IsLocalPlayer,
+        };
 
         private List<LobbyPlayerInfo> TryFromPowerLog(string localName)
         {

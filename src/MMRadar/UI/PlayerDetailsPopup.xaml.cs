@@ -97,11 +97,12 @@ namespace MMRadar.UI
                 BigAvgText.Foreground = ThemeManager.Freeze(ThemeManager.Current.TextMuted);
             }
 
-            DayStatText.Text = s.DayAvg != null && s.GamesToday > 0
-                ? $"{UiHelpers.FormatAvg(s.DayAvg)} avg · {s.GamesToday} games"
+            // Computed from the same derived games shown below — always self-consistent.
+            DayStatText.Text = details.TodayAvg != null && details.TodayCount > 0
+                ? $"{UiHelpers.FormatAvg(details.TodayAvg)} avg · {details.TodayCount} games"
                 : "no games";
-            WeekStatText.Text = s.WeekAvg != null && s.GamesWeek > 0
-                ? $"{UiHelpers.FormatAvg(s.WeekAvg)} avg · {s.GamesWeek} games"
+            WeekStatText.Text = details.Week7Avg != null && details.Week7Count > 0
+                ? $"{UiHelpers.FormatAvg(details.Week7Avg)} avg · {details.Week7Count} games"
                 : "no games";
 
             NoGamesText.Visibility = details.RecentGames.Count == 0

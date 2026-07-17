@@ -48,6 +48,7 @@ namespace MMRadar.Engine
         private bool _previewActive;
         private int _previewGeneration;
         private SettingsWindow _settingsWindow;
+        private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
 
         public void Load()
         {
@@ -58,7 +59,9 @@ namespace MMRadar.Engine
             var dir = Path.Combine(HdtConfig.AppDataPath, "MMRadar");
             _settings = PluginSettings.Load(dir);
             ThemeManager.Apply(_settings.Theme);
-            _wallii = new WalliiService(new WalliiApi(_settings.WalliiBaseUrl, _settings.WalliiAnonKey));
+            _wallii = new WalliiService(
+                new WalliiApi(_settings.WalliiBaseUrl, _settings.WalliiAnonKey),
+                new OfficialBoardClient(_settings.OfficialBoardUrl, dir));
 
             _panel = new LobbyPanel { Visibility = System.Windows.Visibility.Collapsed };
             _popup = new PlayerDetailsPopup { Visibility = System.Windows.Visibility.Collapsed };
@@ -171,6 +174,22 @@ namespace MMRadar.Engine
                         _phase = Phase.Fetching;
                         var generation = ++_fetchGeneration;
                         _ = FetchLobbyStatsAsync(_lobby, generation);
+                    }
+
+                    // A partial roster (e.g. right after a reconnect) keeps improving as
+                    // more names surface — upgrade the panel whenever we learn new ones.
+                    if (_phase == Phase.Loaded && _lobby != null && _lobby.Players.Count < 8 &&
+                        (DateTime.UtcNow - _lastPartialLobbyRetry).TotalSeconds >= 5)
+                    {
+                        _lastPartialLobbyRetry = DateTime.UtcNow;
+                        var better = _tracker.TryResolveLobby();
+                        if (better != null && better.Players.Count > _lobby.Players.Count)
+                        {
+                            _lobby = better;
+                            _phase = Phase.Fetching;
+                            var generation = ++_fetchGeneration;
+                            _ = FetchLobbyStatsAsync(better, generation);
+                        }
                     }
                 }
             }

@@ -123,6 +123,12 @@ namespace MMRadar.Wallii
         public string HeroCardId { get; set; }
         public int GamePlayerId { get; set; }
 
+        /// <summary>
+        /// Rating from the full official leaderboard for players wallii does not track
+        /// (wallii covers only the very top of the ladder).
+        /// </summary>
+        public int? FallbackRating { get; set; }
+
         /// <summary>Best available average placement (day, falling back to week).</summary>
         public double? BestAvg => WeekAvg ?? DayAvg;
     }
@@ -147,5 +153,12 @@ namespace MMRadar.Wallii
 
         /// <summary>Chronological ratings used for the sparkline (oldest first).</summary>
         public List<int> RatingHistory { get; set; } = new List<int>();
+
+        // Computed from the snapshot-derived games (self-consistent with the list
+        // above), rather than trusting wallii's daily/weekly aggregate columns.
+        public int TodayCount { get; set; }
+        public double? TodayAvg { get; set; }
+        public int Week7Count { get; set; }
+        public double? Week7Avg { get; set; }
     }
 }

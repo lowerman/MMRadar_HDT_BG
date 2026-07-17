@@ -19,6 +19,9 @@ namespace MMRadar.Config
         public string WalliiBaseUrl { get; set; }
         public string WalliiAnonKey { get; set; }
 
+        /// <summary>Optional override for the full-leaderboard mirror (bgrank.fly.dev).</summary>
+        public string OfficialBoardUrl { get; set; }
+
         [XmlIgnore]
         public string Directory { get; private set; }
 

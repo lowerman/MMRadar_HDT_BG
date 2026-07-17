@@ -12,6 +12,7 @@ namespace MMRadar.Wallii
     public class WalliiService
     {
         private readonly WalliiApi _api;
+        private readonly OfficialBoardClient _board;
 
         private class CacheEntry<T>
         {
@@ -27,9 +28,10 @@ namespace MMRadar.Wallii
         private readonly ConcurrentDictionary<string, CacheEntry<PlayerDetails>> _detailsCache =
             new ConcurrentDictionary<string, CacheEntry<PlayerDetails>>();
 
-        public WalliiService(WalliiApi api)
+        public WalliiService(WalliiApi api, OfficialBoardClient board = null)
         {
             _api = api;
+            _board = board;
         }
 
         /// <summary>
@@ -66,9 +68,40 @@ namespace MMRadar.Wallii
                 }
             }
 
-            return lobbyNames
+            var summaries = lobbyNames
                 .Select(n => result.TryGetValue(n, out var s) ? s : NotFound(n))
                 .ToList();
+
+            // wallii only tracks the top of the ladder; fill in plain ratings for the
+            // rest from the full official leaderboard mirror.
+            await FillFallbackRatingsAsync(summaries, preferredRegion, gameMode).ConfigureAwait(false);
+
+            return summaries;
+        }
+
+        private async Task FillFallbackRatingsAsync(
+            List<PlayerSummary> summaries, string region, string gameMode)
+        {
+            if (_board == null || region == null)
+                return;
+            if (!summaries.Any(s => !s.OnLeaderboard && s.FallbackRating == null))
+                return;
+            try
+            {
+                var board = await _board.GetBoardAsync(region, gameMode == "1").ConfigureAwait(false);
+                if (board == null)
+                    return;
+                foreach (var s in summaries)
+                {
+                    if (!s.OnLeaderboard && s.FallbackRating == null &&
+                        board.TryGetValue(s.LobbyName, out var rating))
+                        s.FallbackRating = rating;
+                }
+            }
+            catch (Exception ex)
+            {
+                Util.Logger.Debug("Official-board rating fill failed: " + ex.Message);
+            }
         }
 
         private async Task<Dictionary<string, PlayerSummary>> FetchSummariesAsync(
@@ -224,12 +257,25 @@ namespace MMRadar.Wallii
                     RecentGames = hit.Value.RecentGames,
                     RecentAvg = hit.Value.RecentAvg,
                     RatingHistory = hit.Value.RatingHistory,
+                    TodayCount = hit.Value.TodayCount,
+                    TodayAvg = hit.Value.TodayAvg,
+                    Week7Count = hit.Value.Week7Count,
+                    Week7Avg = hit.Value.Week7Avg,
                 };
             }
 
-            var snapshots = await _api.GetSnapshotsAsync(summary.PlayerId, summary.Region, gameMode).ConfigureAwait(false);
+            // 200 snapshots ≈ a week of games even for very active players.
+            var snapshots = await _api.GetSnapshotsAsync(summary.PlayerId, summary.Region, gameMode, limit: 200)
+                .ConfigureAwait(false);
             var records = PlacementEstimator.BuildGameRecords(snapshots);
             var recent = records.Take(recentGames).ToList();
+
+            // Compute today / last-7-days from the same derived games the popup lists,
+            // so the numbers can never contradict each other (wallii's own weekly
+            // aggregates reset on their server's schedule and can look wrong).
+            var localToday = DateTime.Now.Date;
+            var today = records.Where(r => r.At.ToLocalTime().Date == localToday).ToList();
+            var week = records.Where(r => r.At >= DateTimeOffset.UtcNow.AddDays(-7)).ToList();
 
             var details = new PlayerDetails
             {
@@ -240,6 +286,10 @@ namespace MMRadar.Wallii
                     .OrderBy(s => s.SnapshotTime)
                     .Select(s => s.Rating)
                     .ToList(),
+                TodayCount = today.Count,
+                TodayAvg = PlacementEstimator.Average(today),
+                Week7Count = week.Count,
+                Week7Avg = PlacementEstimator.Average(week),
             };
             _detailsCache[cacheKey] = new CacheEntry<PlayerDetails> { Value = details, At = DateTime.UtcNow };
             return details;
@@ -266,6 +316,7 @@ namespace MMRadar.Wallii
             GamesWeek = s.GamesWeek,
             IsLive = s.IsLive,
             TwitchChannel = s.TwitchChannel,
+            FallbackRating = s.FallbackRating,
         };
 
         private static async Task WrapNonCritical(Task task)

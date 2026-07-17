@@ -69,7 +69,7 @@ namespace MMRadar.Harness
 
             WalliiService live = null;
             if (liveNames != null || top)
-                live = new WalliiService(new WalliiApi());
+                live = new WalliiService(new WalliiApi(), new OfficialBoardClient());
 
             panel.PlayerClicked += async summary =>
             {

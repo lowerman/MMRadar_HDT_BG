@@ -90,11 +90,19 @@ namespace MMRadar.UI
                 vm.TooltipText = $"{s.Region} · rank #{s.Rank} · {s.GamesToday} games today · {s.GamesWeek} this week" +
                                  "\nClick for recent games";
             }
+            else if (s.FallbackRating != null)
+            {
+                // On the official leaderboard, but not tracked by wallii:
+                // show the rating, no rank/avg and no clickable dossier.
+                vm.RankText = null;
+                vm.RatingText = UiHelpers.FormatRating(s.FallbackRating.Value);
+                vm.TooltipText = "Official leaderboard rating\nDetailed stats are only available for wallii-tracked players";
+            }
             else
             {
                 vm.RankText = null;
                 vm.RatingText = "—";
-                vm.TooltipText = "Not on the tracked leaderboard\n(below the rating cutoff)";
+                vm.TooltipText = "Not on the official leaderboard\n(below the rating cutoff)";
             }
             return vm;
         }

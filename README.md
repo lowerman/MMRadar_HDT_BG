@@ -34,8 +34,9 @@ Requirements: Windows, Hearthstone Deck Tracker (the plugin resolves its assembl
 ## How it works
 
 - **Lobby names** come from HDT's own memory mirror (`BattlegroundsLobbyInfo` via HearthMirror), with a Power.log fallback (`PlayerID=…, PlayerName=…` lines). No portrait-hovering or extra memory-reading DLLs are needed.
-- **Stats** come from wallii.gg's public Supabase REST API — the same backend their website queries from the browser. wallii mirrors the official Blizzard Battlegrounds leaderboards every few minutes, which implies two honest limitations:
-  - only players **above the leaderboard cutoff** (roughly 8000+ MMR) can be resolved; everyone else shows as "—";
+- **Stats** come from wallii.gg's public Supabase REST API — the same backend their website queries from the browser. wallii tracks the very top of the ladder, so detailed dossiers (recent games, averages) are available for those players.
+- **Ratings for everyone else** come from the full official leaderboard via [BGrank's public mirror](https://github.com/IBM5100o/BGrank_bot) (one cached request per region, 15-min TTL, offline fallback). Honest limitations:
+  - players **below the official cutoff** (roughly 8000 MMR) show as "—";
   - per-game **placements are estimates** inferred from MMR changes (wallii's published formula), not exact Blizzard data.
 - Requests are batched (2–3 per lobby) and cached for 5 minutes to keep the load on wallii minimal. The plugin never scrapes the wallii website itself.
 
@@ -66,7 +67,7 @@ MMRadar.Harness.exe --theme glass --shot out.png      # screenshot a theme
 ## Credits
 
 - **[wallii.gg](https://www.wallii.gg/)** by JimLiu0 & the Wall_Lii team ([wall-lii-app](https://github.com/JimLiu0/wall-lii-app), [Wall_Lii](https://github.com/HS-Tools/Wall_Lii)) — leaderboard data and the placement-estimation formula this plugin re-implements. MMRadar is an unofficial community project and is not affiliated with wallii.
-- **[HDT_BGrank](https://github.com/IBM5100o/HDT_BGrank)** by IBM5100 — the original "opponent MMR overlay" idea.
+- **[HDT_BGrank](https://github.com/IBM5100o/HDT_BGrank)** by IBM5100 — the original "opponent MMR overlay" idea, and the [BGrank_bot](https://github.com/IBM5100o/BGrank_bot) full-leaderboard mirror this plugin uses for sub-top ratings.
 - **[Hearthstone Deck Tracker](https://github.com/HearthSim/Hearthstone-Deck-Tracker)** by HearthSim.
 
 Not affiliated with Blizzard Entertainment. Hearthstone is a trademark of Blizzard Entertainment, Inc.

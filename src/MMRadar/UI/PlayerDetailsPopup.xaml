@@ -122,7 +122,7 @@
                                    Foreground="{DynamicResource TextPrimary}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="THIS WEEK" FontSize="8.5" FontWeight="SemiBold"
+                        <TextBlock Text="LAST 7 DAYS" FontSize="8.5" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextMuted}"/>
                         <TextBlock x:Name="WeekStatText" FontSize="11.5" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"/>

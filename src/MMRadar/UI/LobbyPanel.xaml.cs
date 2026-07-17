@@ -129,8 +129,8 @@ namespace MMRadar.UI
             _lastStatus = null;
             StatusText.Visibility = Visibility.Collapsed;
             _rows = summaries
-                .OrderByDescending(s => s.OnLeaderboard)
-                .ThenByDescending(s => s.Rating)
+                .OrderByDescending(s => s.OnLeaderboard || s.FallbackRating != null)
+                .ThenByDescending(s => s.OnLeaderboard ? s.Rating : s.FallbackRating ?? 0)
                 .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
                 .Select(LobbyRowVm.From)
                 .ToList();
