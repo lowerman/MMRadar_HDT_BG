@@ -31,15 +31,40 @@ namespace MMRadar.UI
         private bool _collapsed;
         private List<LobbyRowVm> _rows = new List<LobbyRowVm>();
 
+        private double _layoutScale = 1.0;
+
+        /// <summary>
+        /// Zoom factor. Applied by scaling font sizes and layout metrics — never a
+        /// RenderTransform, which would blur the text at any non-1.0 zoom.
+        /// </summary>
         public double PanelScale
         {
-            get => RootScale.ScaleX;
+            get => _layoutScale;
             set
             {
                 var clamped = Math.Max(0.5, Math.Min(value, 2.0));
-                RootScale.ScaleX = clamped;
-                RootScale.ScaleY = clamped;
+                if (Math.Abs(clamped - _layoutScale) < 0.001)
+                    return;
+                _layoutScale = clamped;
+                ApplyLayoutScale();
             }
+        }
+
+        private void ApplyLayoutScale()
+        {
+            var k = _layoutScale;
+            Resources["RowFontSize"] = 16.0 * k;
+            Resources["ChipFontSize"] = 13.5 * k;
+            Resources["RowHeight"] = 33.0 * k;
+            Resources["NameMaxWidth"] = 150.0 * k;
+            Resources["BadgeFontSize"] = 10.5 * k;
+            Resources["MarkFontSize"] = 12.0 * k;
+            Resources["DotSize"] = 6.0 * k;
+            Resources["TitleFontSize"] = 11.0 * k;
+            Resources["CtxFontSize"] = 11.0 * k;
+            Resources["StatusFontSize"] = 11.5 * k;
+            Resources["ChipColWidth"] = new GridLength(52.0 * k);
+            RootBorder.MinWidth = _collapsed ? 0 : 192.0 * k;
         }
 
         private IReadOnlyList<PlayerSummary> _lastSummaries;
@@ -87,7 +112,7 @@ namespace MMRadar.UI
             Body.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             TitleRankPart.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             CollapseButton.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
-            RootBorder.MinWidth = _collapsed ? 0 : 192; // the card always hugs its content
+            RootBorder.MinWidth = _collapsed ? 0 : 192.0 * _layoutScale;
             Header.Cursor = _collapsed ? Cursors.Hand : Cursors.SizeAll;
             Header.ToolTip = _collapsed ? "Click to expand · drag to move" : null;
             UpdateIdleOpacity();

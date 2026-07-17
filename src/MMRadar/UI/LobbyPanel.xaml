@@ -1,19 +1,30 @@
 <UserControl x:Class="MMRadar.UI.LobbyPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              FontFamily="Segoe UI"
              SnapsToDevicePixels="True"
-             UseLayoutRounding="True">
-    <!-- The scale must live on the UserControl itself: HDT's overlay hit-testing only
-         accounts for transforms on the registered element and its ancestors. -->
-    <UserControl.RenderTransform>
-        <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1"/>
-    </UserControl.RenderTransform>
+             UseLayoutRounding="True"
+             TextOptions.TextFormattingMode="Display">
+    <!-- Zooming is done by scaling FONT SIZES (see ApplyLayoutScale), not with a
+         RenderTransform: transformed text loses ClearType and gets blurry, while
+         re-rendered text stays crisp at every zoom level. -->
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Theme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <sys:Double x:Key="RowFontSize">16</sys:Double>
+            <sys:Double x:Key="ChipFontSize">13.5</sys:Double>
+            <sys:Double x:Key="RowHeight">33</sys:Double>
+            <sys:Double x:Key="NameMaxWidth">150</sys:Double>
+            <sys:Double x:Key="BadgeFontSize">10.5</sys:Double>
+            <sys:Double x:Key="MarkFontSize">12</sys:Double>
+            <sys:Double x:Key="DotSize">6</sys:Double>
+            <sys:Double x:Key="TitleFontSize">11</sys:Double>
+            <sys:Double x:Key="CtxFontSize">11</sys:Double>
+            <sys:Double x:Key="StatusFontSize">11.5</sys:Double>
+            <GridLength x:Key="ChipColWidth">52</GridLength>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -43,9 +54,9 @@
                     MouseWheel="Header_MouseWheel">
                 <DockPanel Margin="12,6,6,5" LastChildFill="False">
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                        <TextBlock Text="MMR" FontSize="10.5" FontWeight="Bold"
+                        <TextBlock Text="MMR" FontSize="{DynamicResource TitleFontSize}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextSecondary}"/>
-                        <TextBlock x:Name="TitleRankPart" Text="ADAR" FontSize="10.5" FontWeight="Bold"
+                        <TextBlock x:Name="TitleRankPart" Text="ADAR" FontSize="{DynamicResource TitleFontSize}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <Ellipse Width="4" Height="4" Margin="5,1,0,0"
                                  Fill="{DynamicResource Accent}" VerticalAlignment="Center"/>
@@ -61,7 +72,7 @@
             <StackPanel x:Name="Body">
                 <TextBlock x:Name="StatusText"
                            Margin="12,8,12,8"
-                           FontSize="11"
+                           FontSize="{DynamicResource StatusFontSize}"
                            Foreground="{DynamicResource TextSecondary}"
                            Text="Waiting for lobby…"
                            Visibility="Collapsed"/>
@@ -69,7 +80,7 @@
                 <!-- One-line lobby context: average strength and your delta to it -->
                 <TextBlock x:Name="LobbyContextText"
                            Margin="12,5,12,0"
-                           FontSize="10.5"
+                           FontSize="{DynamicResource CtxFontSize}"
                            Foreground="{DynamicResource TextMuted}"
                            Visibility="Collapsed"/>
 
@@ -84,32 +95,32 @@
                                     Opacity="{Binding RowOpacity}">
                                 <!-- HUD typography; shared-size columns keep every row
                                      aligned while the panel hugs its content. -->
-                                <Grid Margin="10,0,8,0" Height="32">
+                                <Grid Margin="10,0,8,0" Height="{DynamicResource RowHeight}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerName"/>
                                         <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerRating"/>
-                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="{DynamicResource ChipColWidth}"/>
                                     </Grid.ColumnDefinitions>
 
                                     <!-- name + markers -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                                                 Margin="0,0,12,0">
                                         <TextBlock Text="{Binding Name}"
-                                                   FontSize="15" FontWeight="SemiBold"
+                                                   FontSize="{DynamicResource RowFontSize}" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimary}"
                                                    TextTrimming="CharacterEllipsis"
-                                                   MaxWidth="150"/>
+                                                   MaxWidth="{DynamicResource NameMaxWidth}"/>
                                         <TextBlock Text="you"
                                                    Visibility="{Binding LocalChipVisibility}"
-                                                   FontSize="10.5" FontWeight="SemiBold"
+                                                   FontSize="{DynamicResource BadgeFontSize}" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource Accent}"
                                                    Margin="5,0,0,0" VerticalAlignment="Center"/>
-                                        <Ellipse Width="6" Height="6"
+                                        <Ellipse Width="{DynamicResource DotSize}" Height="{DynamicResource DotSize}"
                                                  Fill="{StaticResource LiveRed}"
                                                  Visibility="{Binding LiveVisibility}"
                                                  Margin="5,1,0,0" VerticalAlignment="Center"
                                                  ToolTip="Streaming live"/>
-                                        <TextBlock Text="☠" FontSize="12"
+                                        <TextBlock Text="☠" FontSize="{DynamicResource MarkFontSize}"
                                                    Foreground="{DynamicResource TextMuted}"
                                                    Margin="5,0,0,0" VerticalAlignment="Center"
                                                    Visibility="{Binding DeadVisibility}"/>
@@ -118,7 +129,7 @@
                                     <!-- rating: same size and contrast as the name -->
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding RatingText}"
-                                               FontSize="15" FontWeight="SemiBold"
+                                               FontSize="{DynamicResource RowFontSize}" FontWeight="SemiBold"
                                                Foreground="{Binding RatingBrush}"
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Right"
@@ -132,13 +143,13 @@
                                             VerticalAlignment="Center"
                                             HorizontalAlignment="Stretch">
                                         <TextBlock Text="{Binding AvgText}"
-                                                   FontSize="13" FontWeight="Bold"
+                                                   FontSize="{DynamicResource ChipFontSize}" FontWeight="Bold"
                                                    Foreground="{Binding AvgTextBrush}"
                                                    HorizontalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Grid.Column="2"
                                                Visibility="{Binding NoDataVisibility}"
-                                               Text="–" FontSize="13"
+                                               Text="–" FontSize="{DynamicResource ChipFontSize}"
                                                Foreground="{DynamicResource TextMuted}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Grid>

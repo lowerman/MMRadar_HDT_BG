@@ -491,8 +491,10 @@ namespace MMRadar.Engine
             if (double.IsNaN(top)) top = 130;
 
             var scale = _panel.PanelScale;
+            // The panel scales via layout (ActualWidth is final); the popup still
+            // uses a RenderTransform, so its width needs the multiplier.
             var measured = _panel.ActualWidth;
-            var panelWidth = (measured > 50 ? measured : 272) * scale;
+            var panelWidth = measured > 50 ? measured : 272 * scale;
             var popupWidth = 272 * scale;
             var x = left + panelWidth + 8;
 
