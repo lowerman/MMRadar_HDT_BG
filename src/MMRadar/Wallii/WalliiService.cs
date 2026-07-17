@@ -180,7 +180,42 @@ namespace MMRadar.Wallii
                     TwitchChannel = channel?.Channel,
                 };
             }
+
+            // Replace wallii's server-side day/week aggregates (their calendar windows)
+            // with values computed from the same snapshots the dossier uses, so the
+            // lobby chip always matches the popup. wallii numbers remain the fallback.
+            await RecomputeAveragesAsync(
+                result.Values.Where(s => s.OnLeaderboard).ToList(), gameMode).ConfigureAwait(false);
+
             return result;
+        }
+
+        private async Task RecomputeAveragesAsync(List<PlayerSummary> found, string gameMode)
+        {
+            if (found.Count == 0)
+                return;
+            var tasks = found.Select(async s =>
+            {
+                try
+                {
+                    var snapshots = await _api
+                        .GetSnapshotsAsync(s.PlayerId, s.Region, gameMode, limit: 200)
+                        .ConfigureAwait(false);
+                    var records = PlacementEstimator.BuildGameRecords(snapshots);
+                    var localToday = DateTime.Now.Date;
+                    var today = records.Where(r => r.At.ToLocalTime().Date == localToday).ToList();
+                    var week = records.Where(r => r.At >= DateTimeOffset.UtcNow.AddDays(-7)).ToList();
+                    s.DayAvg = PlacementEstimator.Average(today);
+                    s.GamesToday = today.Count;
+                    s.WeekAvg = PlacementEstimator.Average(week);
+                    s.GamesWeek = week.Count;
+                }
+                catch (Exception ex)
+                {
+                    Util.Logger.Debug($"Recompute averages failed for {s.LobbyName}: {ex.Message}");
+                }
+            });
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
         private List<PlayerSummary> _topCache;

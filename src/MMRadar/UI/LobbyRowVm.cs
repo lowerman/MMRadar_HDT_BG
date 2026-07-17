@@ -82,7 +82,7 @@ namespace MMRadar.UI
                     vm.AvgBrush = UiHelpers.AvgPlacementTintBrush(s.BestAvg.Value);
                     vm.AvgTextBrush = UiHelpers.AvgPlacementBrush(s.BestAvg.Value);
                 }
-                vm.TooltipText = $"{s.Region} · rank #{s.Rank} · {s.GamesToday} games today · {s.GamesWeek} this week" +
+                vm.TooltipText = $"{s.Region} · rank #{s.Rank} · avg place {UiHelpers.FormatAvg(s.BestAvg)} over {s.GamesWeek} games in 7 days" +
                                  "\nClick for recent games";
             }
             else if (s.FallbackRating != null)
