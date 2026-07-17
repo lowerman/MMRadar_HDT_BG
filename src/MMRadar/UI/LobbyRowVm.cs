@@ -16,6 +16,7 @@ namespace MMRadar.UI
         public bool HasStats { get; set; }
         public string RankText { get; set; }
         public string RatingText { get; set; }
+        public Brush RatingBrush { get; set; }
         public string AvgText { get; set; }
         public Brush AvgBrush { get; set; }
         public Brush AvgTextBrush { get; set; }
@@ -62,6 +63,8 @@ namespace MMRadar.UI
                 HasStats = s.OnLeaderboard,
                 IsLive = s.IsLive,
             };
+            var theme0 = ThemeManager.Current;
+            vm.RatingBrush = ThemeManager.Freeze(theme0.RatingText);
             if (s.OnLeaderboard)
             {
                 vm.RankText = "#" + s.Rank;
@@ -102,11 +105,20 @@ namespace MMRadar.UI
                                      : "Official leaderboard rating\n") +
                                  "Detailed stats are only available for wallii-tracked players";
             }
+            else if (s.BelowCutoff)
+            {
+                // Confirmed absent from the official board: below the ~8000 cutoff.
+                vm.RankText = null;
+                vm.RatingText = "<" + UiHelpers.FormatRating(8000);
+                vm.RatingBrush = ThemeManager.Freeze(theme0.TextMuted);
+                vm.TooltipText = "Below the official leaderboard cutoff (~8 000 MMR)\nNo detailed stats available";
+            }
             else
             {
                 vm.RankText = null;
                 vm.RatingText = "—";
-                vm.TooltipText = "Not on the official leaderboard\n(below the rating cutoff)";
+                vm.RatingBrush = ThemeManager.Freeze(theme0.TextMuted);
+                vm.TooltipText = "Rating unavailable\n(leaderboard could not be fetched)";
             }
             return vm;
         }

@@ -132,6 +132,12 @@ namespace MMRadar.Wallii
         /// <summary>Rank computed from the full official leaderboard (≈, mirror lags a bit).</summary>
         public int? FallbackRank { get; set; }
 
+        /// <summary>
+        /// The official board was checked and the player is not on it — i.e. they are
+        /// below the ~8000 leaderboard cutoff (as opposed to "board unavailable").
+        /// </summary>
+        public bool BelowCutoff { get; set; }
+
         /// <summary>Best available average placement (day, falling back to week).</summary>
         public double? BestAvg => WeekAvg ?? DayAvg;
     }

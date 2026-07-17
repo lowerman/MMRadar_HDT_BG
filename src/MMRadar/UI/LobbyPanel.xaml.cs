@@ -130,9 +130,9 @@ namespace MMRadar.UI
             _lastSummaries = summaries;
             _lastStatus = null;
             StatusText.Visibility = Visibility.Collapsed;
+            // Real ratings first (desc), then below-cutoff players, then unknowns.
             _rows = summaries
-                .OrderByDescending(s => s.OnLeaderboard || s.FallbackRating != null)
-                .ThenByDescending(s => s.OnLeaderboard ? s.Rating : s.FallbackRating ?? 0)
+                .OrderByDescending(s => s.OnLeaderboard ? s.Rating : s.FallbackRating ?? (s.BelowCutoff ? 1 : 0))
                 .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
                 .Select(LobbyRowVm.From)
                 .ToList();
@@ -143,7 +143,10 @@ namespace MMRadar.UI
         /// <summary>One-line summary: average lobby rating and your delta to it.</summary>
         private void UpdateLobbyContext(IReadOnlyList<PlayerSummary> summaries)
         {
-            int? RatingOf(PlayerSummary s) => s.OnLeaderboard ? s.Rating : s.FallbackRating;
+            // Players confirmed below the leaderboard cutoff count as 8000 — an upper
+            // bound, so the average is marked as approximate.
+            int? RatingOf(PlayerSummary s) =>
+                s.OnLeaderboard ? s.Rating : s.FallbackRating ?? (s.BelowCutoff ? 8000 : (int?)null);
 
             var known = summaries.Select(RatingOf).Where(r => r != null).Select(r => r.Value).ToList();
             if (known.Count < 2)
@@ -152,10 +155,14 @@ namespace MMRadar.UI
                 return;
             }
 
+            var approximate = summaries.Any(s => s.BelowCutoff);
             var avg = (int)Math.Round(known.Average());
             LobbyContextText.Inlines.Clear();
             LobbyContextText.Inlines.Add(new System.Windows.Documents.Run(
-                $"lobby avg {UiHelpers.FormatRating(avg)}"));
+                $"lobby avg {(approximate ? "~" : "")}{UiHelpers.FormatRating(avg)}"));
+            LobbyContextText.ToolTip = approximate
+                ? "Players below the leaderboard cutoff are counted as 8 000"
+                : null;
 
             var local = summaries.FirstOrDefault(s => s.IsLocalPlayer);
             var localRating = local != null ? RatingOf(local) : null;

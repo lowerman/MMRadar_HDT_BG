@@ -93,11 +93,16 @@ namespace MMRadar.Wallii
                     return;
                 foreach (var s in summaries)
                 {
-                    if (!s.OnLeaderboard && s.FallbackRating == null &&
-                        board.Ratings.TryGetValue(s.LobbyName, out var rating))
+                    if (s.OnLeaderboard || s.FallbackRating != null)
+                        continue;
+                    if (board.Ratings.TryGetValue(s.LobbyName, out var rating))
                     {
                         s.FallbackRating = rating;
                         s.FallbackRank = board.RankOf(rating);
+                    }
+                    else
+                    {
+                        s.BelowCutoff = true;
                     }
                 }
             }
@@ -321,6 +326,7 @@ namespace MMRadar.Wallii
             TwitchChannel = s.TwitchChannel,
             FallbackRating = s.FallbackRating,
             FallbackRank = s.FallbackRank,
+            BelowCutoff = s.BelowCutoff,
         };
 
         private static async Task WrapNonCritical(Task task)

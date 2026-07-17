@@ -124,7 +124,7 @@
                                     <TextBlock Grid.Column="2"
                                                Text="{Binding RatingText}"
                                                FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource RatingBrush}"
+                                               Foreground="{Binding RatingBrush}"
                                                VerticalAlignment="Center"
                                                Margin="6,0"/>
 
