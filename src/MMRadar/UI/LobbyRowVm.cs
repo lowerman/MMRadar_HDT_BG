@@ -14,20 +14,16 @@ namespace MMRadar.UI
         public string Name { get; set; }
         public bool IsLocal { get; set; }
         public bool HasStats { get; set; }
-        public string RankText { get; set; }
         public string RatingText { get; set; }
         public Brush RatingBrush { get; set; }
         public string AvgText { get; set; }
         public Brush AvgBrush { get; set; }
         public Brush AvgTextBrush { get; set; }
         public bool IsLive { get; set; }
-        public Brush RankBrush { get; set; }
         public string TooltipText { get; set; }
 
         public Visibility LocalChipVisibility => IsLocal ? Visibility.Visible : Visibility.Collapsed;
         public Visibility LiveVisibility => IsLive ? Visibility.Visible : Visibility.Collapsed;
-        public Visibility RankVisibility =>
-            string.IsNullOrEmpty(RankText) ? Visibility.Hidden : Visibility.Visible;
         public Visibility AvgVisibility => HasStats ? Visibility.Visible : Visibility.Collapsed;
         public Visibility NoDataVisibility => HasStats ? Visibility.Collapsed : Visibility.Visible;
 
@@ -67,10 +63,6 @@ namespace MMRadar.UI
             vm.RatingBrush = ThemeManager.Freeze(theme0.RatingText);
             if (s.OnLeaderboard)
             {
-                vm.RankText = "#" + s.Rank;
-                vm.RankBrush = s.Rank <= 100
-                    ? ThemeManager.Freeze(ThemeManager.Current.Accent)
-                    : ThemeManager.Freeze(ThemeManager.Current.TextSecondary);
                 vm.RatingText = UiHelpers.FormatRating(s.Rating);
                 vm.AvgText = UiHelpers.FormatAvg(s.BestAvg);
                 var theme = ThemeManager.Current;
@@ -96,9 +88,7 @@ namespace MMRadar.UI
             else if (s.FallbackRating != null)
             {
                 // On the official leaderboard, but not tracked by wallii: rating plus a
-                // rank computed from the full board; no clickable dossier.
-                vm.RankText = s.FallbackRank != null ? "#" + s.FallbackRank : null;
-                vm.RankBrush = ThemeManager.Freeze(ThemeManager.Current.TextMuted);
+                // rank computed from the full board (tooltip); no clickable dossier.
                 vm.RatingText = UiHelpers.FormatRating(s.FallbackRating.Value);
                 vm.TooltipText = (s.FallbackRank != null
                                      ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
@@ -108,14 +98,12 @@ namespace MMRadar.UI
             else if (s.BelowCutoff)
             {
                 // Confirmed absent from the official board: below the ~8000 cutoff.
-                vm.RankText = null;
                 vm.RatingText = "<" + UiHelpers.FormatRating(8000);
                 vm.RatingBrush = ThemeManager.Freeze(theme0.TextMuted);
                 vm.TooltipText = "Below the official leaderboard cutoff (~8 000 MMR)\nNo detailed stats available";
             }
             else
             {
-                vm.RankText = null;
                 vm.RatingText = "—";
                 vm.RatingBrush = ThemeManager.Freeze(theme0.TextMuted);
                 vm.TooltipText = "Rating unavailable\n(leaderboard could not be fetched)";
