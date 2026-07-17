@@ -9,7 +9,9 @@ namespace MMRadar.Config
     {
         public double PanelLeft { get; set; } = 40;
         public double PanelTop { get; set; } = 130;
-        public double Scale { get; set; } = 1.0;
+
+        /// <summary>0 = auto (scale with the game window resolution); >0 = fixed by the user.</summary>
+        public double Scale { get; set; } = 0;
         public bool OverlayEnabled { get; set; } = true;
         public bool Collapsed { get; set; }
         public string Theme { get; set; } = "dark";
@@ -58,10 +60,11 @@ namespace MMRadar.Config
             {
                 Logger.Error("Failed to load settings, using defaults", ex);
             }
-            // Migration: early builds auto-computed the scale before the overlay window
-            // was sized and could latch a uselessly tiny value.
-            if (settings.Scale <= 0.55 || double.IsNaN(settings.Scale))
-                settings.Scale = 1.0;
+            // Migrations: early builds latched a uselessly tiny auto-value (<=0.55), and
+            // later builds saved the fixed default 1.0 — both mean "the user never chose
+            // a scale", so return them to auto.
+            if (settings.Scale <= 0.55 || settings.Scale == 1.0 || double.IsNaN(settings.Scale))
+                settings.Scale = 0;
             return settings;
         }
 

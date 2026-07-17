@@ -50,6 +50,9 @@ namespace MMRadar.Engine
         private SettingsWindow _settingsWindow;
         private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
 
+        /// <summary>True once the user has chosen an explicit scale (mouse wheel).</summary>
+        private bool _scaleTouched;
+
         public void Load()
         {
             Logger.InfoSink = m => HdtLog.Info("[MMRadar] " + m);
@@ -68,15 +71,22 @@ namespace MMRadar.Engine
 
             Canvas.SetLeft(_panel, SafeCoord(_settings.PanelLeft, 40));
             Canvas.SetTop(_panel, SafeCoord(_settings.PanelTop, 130));
+            // Provisional until the overlay window has a real size (see ShowPanel):
+            // at plugin load HDT's overlay still has its design-time dimensions.
             _panel.PanelScale = _settings.Scale > 0 ? _settings.Scale : 1.0;
             _popup.PanelScale = _panel.PanelScale;
+            _scaleTouched = _settings.Scale > 0;
 
             OverlayExtensions.SetIsOverlayHitTestVisible(_panel, true);
             OverlayExtensions.SetIsOverlayHitTestVisible(_popup, true);
 
             _panel.PlayerClicked += OnPlayerClicked;
             _panel.LayoutChanged += SaveLayout;
-            _panel.ScaleChangedByUser += () => _popup.PanelScale = _panel.PanelScale;
+            _panel.ScaleChangedByUser += () =>
+            {
+                _scaleTouched = true;
+                _popup.PanelScale = _panel.PanelScale;
+            };
             _panel.IsCollapsed = _settings.Collapsed;
             _panel.CollapsedChanged += collapsed =>
             {
@@ -406,14 +416,16 @@ namespace MMRadar.Engine
         {
             Canvas.SetLeft(_panel, 40);
             Canvas.SetTop(_panel, 130);
-            _panel.PanelScale = 1.0;
-            _popup.PanelScale = 1.0;
             _settings.PanelLeft = 40;
             _settings.PanelTop = 130;
-            _settings.Scale = 1.0;
+            // Back to resolution-based auto scale.
+            _settings.Scale = 0;
+            _scaleTouched = false;
+            _panel.PanelScale = 1.0;
+            _popup.PanelScale = 1.0;
             _settings.Save();
             _hiddenForThisGame = false;
-            ShowPanel();
+            ShowPanel(); // re-applies the auto scale when the overlay has a real size
         }
 
         private void ResetToIdle()
@@ -431,7 +443,38 @@ namespace MMRadar.Engine
                 HidePanel();
         }
 
-        private void ShowPanel() => _panel.Visibility = System.Windows.Visibility.Visible;
+        private void ShowPanel()
+        {
+            ApplyAutoScale();
+            _panel.Visibility = System.Windows.Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Auto mode: match the game-window resolution so the panel keeps the same
+        /// on-screen proportion everywhere (1080p ×1.0, 1440p ×1.33, 4K ×2.0).
+        /// Only runs once the overlay window has been sized to the real game window,
+        /// and is never persisted — the user's own wheel-zoom takes over for good.
+        /// </summary>
+        private void ApplyAutoScale()
+        {
+            if (_scaleTouched)
+                return;
+            try
+            {
+                var width = HdtCore.OverlayWindow.ActualWidth;
+                if (width < 1000)
+                    return; // overlay not sized to the game yet
+                var auto = Math.Max(1.0, Math.Min(width / 1920.0, 2.0));
+                if (Math.Abs(_panel.PanelScale - auto) < 0.01)
+                    return;
+                _panel.PanelScale = auto;
+                _popup.PanelScale = auto;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("ApplyAutoScale: " + ex.Message);
+            }
+        }
 
         private void HidePanel()
         {
@@ -469,7 +512,10 @@ namespace MMRadar.Engine
                 var top = Canvas.GetTop(_panel);
                 if (!double.IsNaN(left)) _settings.PanelLeft = left;
                 if (!double.IsNaN(top)) _settings.PanelTop = top;
-                _settings.Scale = _panel.PanelScale;
+                // Persist the scale only once the user explicitly chose one; an
+                // auto-derived value must never be latched into the settings.
+                if (_scaleTouched)
+                    _settings.Scale = _panel.PanelScale;
                 _settings.Save();
             }
             catch (Exception ex)
