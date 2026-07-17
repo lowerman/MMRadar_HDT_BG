@@ -20,15 +20,40 @@ namespace MMRadar.UI
         /// <summary>Chart series: pre-window rating followed by each game's ending MMR.</summary>
         private List<double> _series = new List<double>();
 
+        private double _layoutScale = 1.0;
+
+        /// <summary>Zoom via font/metric scaling — matches LobbyPanel, keeps text crisp.</summary>
         public double PanelScale
         {
-            get => RootScale.ScaleX;
+            get => _layoutScale;
             set
             {
                 var clamped = Math.Max(0.5, Math.Min(value, 2.0));
-                RootScale.ScaleX = clamped;
-                RootScale.ScaleY = clamped;
+                if (Math.Abs(clamped - _layoutScale) < 0.001)
+                    return;
+                _layoutScale = clamped;
+                ApplyLayoutScale();
             }
+        }
+
+        private void ApplyLayoutScale()
+        {
+            var k = _layoutScale;
+            Resources["PopupWidth"] = 280.0 * k;
+            Resources["PNameFont"] = 15.0 * k;
+            Resources["PSubFont"] = 11.0 * k;
+            Resources["PStatusFont"] = 12.0 * k;
+            Resources["PCapFont"] = 9.5 * k;
+            Resources["PBigCapFont"] = 10.0 * k;
+            Resources["PBigFont"] = 22.0 * k;
+            Resources["PValFont"] = 12.5 * k;
+            Resources["PGameFont"] = 12.0 * k;
+            Resources["PGameChipFont"] = 11.5 * k;
+            Resources["PChartHeight"] = 36.0 * k;
+            Resources["PBadgeFont"] = 10.0 * k;
+            Resources["PColTime"] = new GridLength(80.0 * k);
+            Resources["PColChip"] = new GridLength(36.0 * k);
+            Resources["PColDelta"] = new GridLength(52.0 * k);
         }
 
         private class GameRowVm
@@ -173,7 +198,7 @@ namespace MMRadar.UI
         {
             SparklineCanvas.Children.Clear();
             var w = SparklineCanvas.ActualWidth;
-            var h = 34.0;
+            var h = SparklineCanvas.ActualHeight > 10 ? SparklineCanvas.ActualHeight : 36.0;
             if (_series.Count < 2 || w < 20)
                 return;
 

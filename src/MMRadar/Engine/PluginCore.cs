@@ -491,11 +491,10 @@ namespace MMRadar.Engine
             if (double.IsNaN(top)) top = 130;
 
             var scale = _panel.PanelScale;
-            // The panel scales via layout (ActualWidth is final); the popup still
-            // uses a RenderTransform, so its width needs the multiplier.
+            // Both cards scale via layout, so ActualWidth is already final.
             var measured = _panel.ActualWidth;
             var panelWidth = measured > 50 ? measured : 272 * scale;
-            var popupWidth = 272 * scale;
+            var popupWidth = _popup.ActualWidth > 50 ? _popup.ActualWidth : 280 * scale;
             var x = left + panelWidth + 8;
 
             var canvasWidth = HdtCore.OverlayCanvas.ActualWidth;
