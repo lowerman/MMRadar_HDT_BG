@@ -8,6 +8,7 @@
     <SolidColorBrush x:Key="TextPrimary" Color="#FFF2F4F6"/>
     <SolidColorBrush x:Key="TextSecondary" Color="#FFAAB0B7"/>
     <SolidColorBrush x:Key="TextMuted" Color="#FF787E85"/>
+    <SolidColorBrush x:Key="RatingBrush" Color="#FFDCE1E7"/>
     <SolidColorBrush x:Key="Accent" Color="#FFE6C377"/>
     <SolidColorBrush x:Key="Gold" Color="#FFE6C377"/>
     <SolidColorBrush x:Key="LiveRed" Color="#FFFF5C5C"/>

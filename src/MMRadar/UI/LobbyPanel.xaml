@@ -113,11 +113,11 @@
                                                    Visibility="{Binding DeadVisibility}"/>
                                     </StackPanel>
 
-                                    <!-- rating -->
+                                    <!-- rating: slightly brighter and heavier than body text -->
                                     <TextBlock Grid.Column="2"
                                                Text="{Binding RatingText}"
-                                               FontSize="12"
-                                               Foreground="{DynamicResource TextSecondary}"
+                                               FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource RatingBrush}"
                                                VerticalAlignment="Center"
                                                Margin="6,0"/>
 

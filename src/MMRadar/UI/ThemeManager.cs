@@ -20,6 +20,9 @@ namespace MMRadar.UI
         public Color TextPrimary { get; set; }
         public Color TextSecondary { get; set; }
         public Color TextMuted { get; set; }
+
+        /// <summary>Rating numbers: between primary and secondary — visible, not shouting.</summary>
+        public Color RatingText { get; set; }
         public Color Accent { get; set; }
         public Color ChipBackground { get; set; }
         public Color RowHover { get; set; }
@@ -43,6 +46,7 @@ namespace MMRadar.UI
             TextPrimary = FromHex("#FFF4F6F8"),
             TextSecondary = FromHex("#FFAEB4BB"),
             TextMuted = FromHex("#FF7C828A"),
+            RatingText = FromHex("#FFDCE1E7"),
             Accent = FromHex("#FFE6C377"),
             ChipBackground = FromHex("#24FFFFFF"),
             RowHover = FromHex("#16FFFFFF"),
@@ -61,6 +65,7 @@ namespace MMRadar.UI
             TextPrimary = FromHex("#FFF4F6F8"),
             TextSecondary = FromHex("#FFAEB4BB"),
             TextMuted = FromHex("#FF7C828A"),
+            RatingText = FromHex("#FFDCE1E7"),
             Accent = FromHex("#FFE6C377"),
             ChipBackground = FromHex("#1CFFFFFF"),
             RowHover = FromHex("#12FFFFFF"),
@@ -79,6 +84,7 @@ namespace MMRadar.UI
             TextPrimary = FromHex("#FFF2EDE3"),
             TextSecondary = FromHex("#FFA89F90"),
             TextMuted = FromHex("#FF6E675A"),
+            RatingText = FromHex("#FFDFD8C8"),
             Accent = FromHex("#FFE3B65C"),
             ChipBackground = FromHex("#24FFFFFF"),
             RowHover = FromHex("#14FFFFFF"),
@@ -122,6 +128,7 @@ namespace MMRadar.UI
             resources["TextPrimary"] = Freeze(p.TextPrimary);
             resources["TextSecondary"] = Freeze(p.TextSecondary);
             resources["TextMuted"] = Freeze(p.TextMuted);
+            resources["RatingBrush"] = Freeze(p.RatingText);
             resources["Accent"] = Freeze(p.Accent);
             resources["Gold"] = Freeze(p.Accent);
             resources["ChipBackground"] = Freeze(p.ChipBackground);

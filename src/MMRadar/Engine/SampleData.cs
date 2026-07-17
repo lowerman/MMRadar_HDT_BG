@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using MMRadar.Wallii;
 
 namespace MMRadar.Engine
@@ -44,12 +45,18 @@ namespace MMRadar.Engine
                 t = t.AddMinutes(-rng.Next(25, 90));
             }
             history.Insert(0, rating);
+            var localToday = DateTime.Now.Date;
+            var today = games.Where(g => g.At.ToLocalTime().Date == localToday).ToList();
             return new PlayerDetails
             {
                 Summary = summary,
                 RecentGames = games,
                 RecentAvg = PlacementEstimator.Average(games),
                 RatingHistory = history,
+                TodayCount = today.Count,
+                TodayAvg = PlacementEstimator.Average(today),
+                Week7Count = games.Count,
+                Week7Avg = PlacementEstimator.Average(games),
             };
         }
     }

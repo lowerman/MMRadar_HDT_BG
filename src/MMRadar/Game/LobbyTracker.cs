@@ -111,9 +111,13 @@ namespace MMRadar.Game
 
             // Guard against HDT's watcher still serving the previous game's lobby —
             // but a reconnect into the SAME game restores the remembered roster.
+            // HDT never clears MetaData, so a stale uuid can also mean "a brand new
+            // game (e.g. spectating) whose lobby info has not surfaced yet": only
+            // trust the cached roster once the current Power.log confirms its names.
             if (lobbyInfo.GameUuid != null && lobbyInfo.GameUuid == _consumedGameUuid)
             {
-                if (lobbyInfo.GameUuid == _lastLobbyUuid && _lastLobbyPlayers != null)
+                if (lobbyInfo.GameUuid == _lastLobbyUuid && _lastLobbyPlayers != null &&
+                    PowerLogConfirmsCachedRoster())
                     return _lastLobbyPlayers.Select(CopyPlayer).ToList();
                 return null;
             }
@@ -150,6 +154,20 @@ namespace MMRadar.Game
             HeroCardId = p.HeroCardId,
             IsLocalPlayer = p.IsLocalPlayer,
         };
+
+        /// <summary>
+        /// True when the names printed to the CURRENT game's Power.log overlap the
+        /// remembered roster — i.e. this really is a reconnect into the same game and
+        /// not a new game (spectating, next match) with stale metadata.
+        /// </summary>
+        private bool PowerLogConfirmsCachedRoster()
+        {
+            if (_namesByPlayerId.Count < 2)
+                return false; // too early to tell — wait for the log instead of guessing
+            var overlap = _namesByPlayerId.Values.Count(n =>
+                _lastLobbyPlayers.Any(p => string.Equals(p.Name, n, StringComparison.OrdinalIgnoreCase)));
+            return overlap >= 2;
+        }
 
         private List<LobbyPlayerInfo> TryFromPowerLog(string localName)
         {
