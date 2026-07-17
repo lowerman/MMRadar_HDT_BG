@@ -6,10 +6,12 @@ A [Hearthstone Deck Tracker](https://hsreplay.net/downloads/) plugin for **Battl
 
 ## Features
 
-- 🏆 **Lobby overview** — all 8 players with their leaderboard rank, rating, and average placement, sorted by rating. Players who are streaming get a live dot; dead players grey out as the game goes on.
-- 🔍 **Player dossier on click** — recent games (estimated placement, MMR delta, resulting MMR), average placement over the last ~10 games / today / this week, and an MMR trajectory chart aligned with the game list.
+- 🏆 **Lobby overview** — every player's rating and a color-coded **7-day average placement**, sorted by rating. The header shows the **lobby average and your delta** to it; streamers get a live dot, dead players grey out as the game goes on.
+- 📈 **The whole ladder covered** — wallii-tracked top players get full stats; everyone else on the official leaderboard still shows their rating (and a computed rank in the tooltip); confirmed sub-cutoff players show **<8 000**.
+- 🔍 **Player dossier on click** — recent games (estimated placement, MMR delta, resulting MMR), averages over the last ~10 games / today / last 7 days (all computed from the same data, so they never contradict each other), and an MMR trajectory chart aligned with the game list.
+- 🔤 **HUD-grade readability** — big high-contrast type, an auto-width card that hugs its content, and resolution-aware scaling (1080p ×1.0, 1440p ×1.33, 4K ×2.0). Zooming re-renders the text, so it stays crisp at any size.
 - 🎨 **Three themes** — **Dark** (solid, maximum readability — default), **Glass** (translucent and airy), **Warm** (blends with Hearthstone's look). Switch instantly in Settings.
-- 🫥 **Stays out of your way** — collapse the panel into a tiny ~30%-opacity pill; click the pill to expand, drag to move. Position, scale, and collapsed state persist.
+- 🫥 **Stays out of your way** — collapse the panel into a tiny ~30%-opacity pill <img src="artifacts/screenshot-collapsed.png" alt="collapsed pill" height="22">; click the pill to expand, drag to move. Position, scale, and collapsed state persist.
 - 🧪 **Live preview** — show the overlay with the current world top-8 (real wallii data) to position and scale it without starting a game.
 
 ## Install
@@ -35,8 +37,8 @@ Requirements: Windows, Hearthstone Deck Tracker (the plugin resolves its assembl
 
 - **Lobby names** come from HDT's own memory mirror (`BattlegroundsLobbyInfo` via HearthMirror), with a Power.log fallback (`PlayerID=…, PlayerName=…` lines). No portrait-hovering or extra memory-reading DLLs are needed.
 - **Stats** come from wallii.gg's public Supabase REST API — the same backend their website queries from the browser. wallii tracks the very top of the ladder, so detailed dossiers (recent games, averages) are available for those players.
-- **Ratings for everyone else** come from the full official leaderboard via [BGrank's public mirror](https://github.com/IBM5100o/BGrank_bot) (one cached request per region, 15-min TTL, offline fallback). Honest limitations:
-  - players **below the official cutoff** (roughly 8000 MMR) show as "—";
+- **Ratings for everyone else** come from the full official leaderboard via [BGrank's public mirror](https://github.com/IBM5100o/BGrank_bot) (one cached request per region, 15-min TTL, offline fallback); their approximate rank is computed from the same board. Honest limitations:
+  - players **below the official cutoff** (roughly 8000 MMR) show as "<8 000" and count toward the lobby average as 8 000;
   - per-game **placements are estimates** inferred from MMR changes (wallii's published formula), not exact Blizzard data.
 - Requests are batched (2–3 per lobby) and cached for 5 minutes to keep the load on wallii minimal. The plugin never scrapes the wallii website itself.
 
