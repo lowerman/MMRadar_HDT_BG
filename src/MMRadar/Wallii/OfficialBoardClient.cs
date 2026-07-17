@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -9,6 +10,39 @@ using MMRadar.Util;
 
 namespace MMRadar.Wallii
 {
+    /// <summary>A region's full official leaderboard with rank lookups.</summary>
+    public class OfficialBoard
+    {
+        private readonly int[] _ratingsAscending;
+
+        public IReadOnlyDictionary<string, int> Ratings { get; }
+
+        public int Count => _ratingsAscending.Length;
+
+        public OfficialBoard(Dictionary<string, int> ratings)
+        {
+            Ratings = ratings;
+            _ratingsAscending = ratings.Values.ToArray();
+            Array.Sort(_ratingsAscending);
+        }
+
+        /// <summary>1-based rank for a rating; ties share the better rank.</summary>
+        public int RankOf(int rating)
+        {
+            // first index whose value is strictly greater than `rating`
+            int lo = 0, hi = _ratingsAscending.Length;
+            while (lo < hi)
+            {
+                var mid = (lo + hi) / 2;
+                if (_ratingsAscending[mid] <= rating)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+            return _ratingsAscending.Length - lo + 1;
+        }
+    }
+
     /// <summary>
     /// Full official Battlegrounds leaderboard (every player above the ~8000 cutoff),
     /// served by IBM5100's public BGrank mirror (github.com/IBM5100o/BGrank_bot) —
@@ -27,7 +61,7 @@ namespace MMRadar.Wallii
 
         private class BoardEntry
         {
-            public Dictionary<string, int> Ratings;
+            public OfficialBoard Board;
             public DateTime At;
         }
 
@@ -44,10 +78,10 @@ namespace MMRadar.Wallii
         }
 
         /// <summary>
-        /// Name → rating for the whole official leaderboard of a region.
+        /// The whole official leaderboard of a region (name → rating + rank lookups).
         /// Returns null when the board cannot be fetched and no offline copy exists.
         /// </summary>
-        public async Task<IReadOnlyDictionary<string, int>> GetBoardAsync(string region, bool duos)
+        public async Task<OfficialBoard> GetBoardAsync(string region, bool duos)
         {
             var key = MapRegion(region);
             if (key == null)
@@ -56,7 +90,7 @@ namespace MMRadar.Wallii
                 key += "_duo";
 
             if (_cache.TryGetValue(key, out var hit) && DateTime.UtcNow - hit.At < CacheTtl)
-                return hit.Ratings;
+                return hit.Board;
 
             string text = null;
             try
@@ -71,16 +105,17 @@ namespace MMRadar.Wallii
                 if (text == null)
                 {
                     // Keep serving a stale in-memory board rather than nothing.
-                    return _cache.TryGetValue(key, out var stale) ? stale.Ratings : null;
+                    return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
                 }
             }
 
             var ratings = Parse(text);
             if (ratings.Count == 0)
-                return _cache.TryGetValue(key, out var stale) ? stale.Ratings : null;
+                return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
 
-            _cache[key] = new BoardEntry { Ratings = ratings, At = DateTime.UtcNow };
-            return ratings;
+            var board = new OfficialBoard(ratings);
+            _cache[key] = new BoardEntry { Board = board, At = DateTime.UtcNow };
+            return board;
         }
 
         private static Dictionary<string, int> Parse(string text)

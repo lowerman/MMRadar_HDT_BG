@@ -94,8 +94,11 @@ namespace MMRadar.Wallii
                 foreach (var s in summaries)
                 {
                     if (!s.OnLeaderboard && s.FallbackRating == null &&
-                        board.TryGetValue(s.LobbyName, out var rating))
+                        board.Ratings.TryGetValue(s.LobbyName, out var rating))
+                    {
                         s.FallbackRating = rating;
+                        s.FallbackRank = board.RankOf(rating);
+                    }
                 }
             }
             catch (Exception ex)
@@ -317,6 +320,7 @@ namespace MMRadar.Wallii
             IsLive = s.IsLive,
             TwitchChannel = s.TwitchChannel,
             FallbackRating = s.FallbackRating,
+            FallbackRank = s.FallbackRank,
         };
 
         private static async Task WrapNonCritical(Task task)

@@ -128,6 +128,10 @@ namespace MMRadar.Harness
                             if (details != null)
                                 popup.SetData(details);
                         }
+                        else
+                        {
+                            popup.Visibility = Visibility.Collapsed;
+                        }
                     }
                     else
                     {

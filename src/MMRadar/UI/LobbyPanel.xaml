@@ -65,6 +65,13 @@
                            Text="Waiting for lobby…"
                            Visibility="Collapsed"/>
 
+                <!-- One-line lobby context: average strength and your delta to it -->
+                <TextBlock x:Name="LobbyContextText"
+                           Margin="12,5,12,0"
+                           FontSize="9.5"
+                           Foreground="{DynamicResource TextMuted}"
+                           Visibility="Collapsed"/>
+
                 <ItemsControl x:Name="RowsControl" Margin="0,4">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -76,7 +83,7 @@
                                     Opacity="{Binding RowOpacity}">
                                 <Grid Margin="8,0" Height="25">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="42"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="42"/>

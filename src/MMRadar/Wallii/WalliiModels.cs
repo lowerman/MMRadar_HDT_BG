@@ -129,6 +129,9 @@ namespace MMRadar.Wallii
         /// </summary>
         public int? FallbackRating { get; set; }
 
+        /// <summary>Rank computed from the full official leaderboard (≈, mirror lags a bit).</summary>
+        public int? FallbackRank { get; set; }
+
         /// <summary>Best available average placement (day, falling back to week).</summary>
         public double? BestAvg => WeekAvg ?? DayAvg;
     }

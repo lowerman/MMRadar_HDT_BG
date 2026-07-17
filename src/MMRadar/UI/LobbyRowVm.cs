@@ -92,11 +92,15 @@ namespace MMRadar.UI
             }
             else if (s.FallbackRating != null)
             {
-                // On the official leaderboard, but not tracked by wallii:
-                // show the rating, no rank/avg and no clickable dossier.
-                vm.RankText = null;
+                // On the official leaderboard, but not tracked by wallii: rating plus a
+                // rank computed from the full board; no clickable dossier.
+                vm.RankText = s.FallbackRank != null ? "#" + s.FallbackRank : null;
+                vm.RankBrush = ThemeManager.Freeze(ThemeManager.Current.TextMuted);
                 vm.RatingText = UiHelpers.FormatRating(s.FallbackRating.Value);
-                vm.TooltipText = "Official leaderboard rating\nDetailed stats are only available for wallii-tracked players";
+                vm.TooltipText = (s.FallbackRank != null
+                                     ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
+                                     : "Official leaderboard rating\n") +
+                                 "Detailed stats are only available for wallii-tracked players";
             }
             else
             {

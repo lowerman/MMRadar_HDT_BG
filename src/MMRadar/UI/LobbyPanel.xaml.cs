@@ -103,12 +103,14 @@ namespace MMRadar.UI
         public void ShowWaiting()
         {
             RowsControl.ItemsSource = _rows = new List<LobbyRowVm>();
+            LobbyContextText.Visibility = Visibility.Collapsed;
             StatusText.Text = "Waiting for lobby…";
             StatusText.Visibility = Visibility.Visible;
         }
 
         public void ShowLoading(IReadOnlyList<LobbyPlayerInfo> players)
         {
+            LobbyContextText.Visibility = Visibility.Collapsed;
             StatusText.Text = "Loading wallii.gg stats…";
             StatusText.Visibility = Visibility.Visible;
             _rows = players
@@ -135,6 +137,41 @@ namespace MMRadar.UI
                 .Select(LobbyRowVm.From)
                 .ToList();
             RowsControl.ItemsSource = _rows;
+            UpdateLobbyContext(summaries);
+        }
+
+        /// <summary>One-line summary: average lobby rating and your delta to it.</summary>
+        private void UpdateLobbyContext(IReadOnlyList<PlayerSummary> summaries)
+        {
+            int? RatingOf(PlayerSummary s) => s.OnLeaderboard ? s.Rating : s.FallbackRating;
+
+            var known = summaries.Select(RatingOf).Where(r => r != null).Select(r => r.Value).ToList();
+            if (known.Count < 2)
+            {
+                LobbyContextText.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var avg = (int)Math.Round(known.Average());
+            LobbyContextText.Inlines.Clear();
+            LobbyContextText.Inlines.Add(new System.Windows.Documents.Run(
+                $"lobby avg {UiHelpers.FormatRating(avg)}"));
+
+            var local = summaries.FirstOrDefault(s => s.IsLocalPlayer);
+            var localRating = local != null ? RatingOf(local) : null;
+            if (localRating != null)
+            {
+                var delta = localRating.Value - avg;
+                LobbyContextText.Inlines.Add(new System.Windows.Documents.Run("  ·  you "));
+                LobbyContextText.Inlines.Add(new System.Windows.Documents.Run(UiHelpers.FormatDelta(delta))
+                {
+                    Foreground = delta >= 0
+                        ? UiHelpers.PlacementBrush(2)
+                        : ThemeManager.Freeze(System.Windows.Media.Color.FromArgb(0xFF, 0xF8, 0x71, 0x71)),
+                    FontWeight = FontWeights.SemiBold,
+                });
+            }
+            LobbyContextText.Visibility = Visibility.Visible;
         }
 
         public void SetStatus(string message)
