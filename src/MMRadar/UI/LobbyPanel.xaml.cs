@@ -87,7 +87,7 @@ namespace MMRadar.UI
             Body.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             TitleRankPart.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             CollapseButton.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
-            RootBorder.Width = _collapsed ? double.NaN : 272; // NaN = size to content
+            RootBorder.MinWidth = _collapsed ? 0 : 192; // the card always hugs its content
             Header.Cursor = _collapsed ? Cursors.Hand : Cursors.SizeAll;
             Header.ToolTip = _collapsed ? "Click to expand · drag to move" : null;
             UpdateIdleOpacity();

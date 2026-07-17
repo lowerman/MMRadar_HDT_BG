@@ -491,7 +491,8 @@ namespace MMRadar.Engine
             if (double.IsNaN(top)) top = 130;
 
             var scale = _panel.PanelScale;
-            var panelWidth = 272 * scale;
+            var measured = _panel.ActualWidth;
+            var panelWidth = (measured > 50 ? measured : 272) * scale;
             var popupWidth = 272 * scale;
             var x = left + panelWidth + 8;
 

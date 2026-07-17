@@ -17,8 +17,9 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
+    <!-- Auto-width: the card hugs its content like BGRank instead of a fixed size -->
     <Border x:Name="RootBorder"
-            Width="272"
+            MinWidth="192"
             CornerRadius="12"
             Background="{DynamicResource PanelBackground}"
             BorderBrush="{DynamicResource PanelBorder}"
@@ -72,7 +73,7 @@
                            Foreground="{DynamicResource TextMuted}"
                            Visibility="Collapsed"/>
 
-                <ItemsControl x:Name="RowsControl" Margin="0,4">
+                <ItemsControl x:Name="RowsControl" Margin="0,4" Grid.IsSharedSizeScope="True">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Style="{StaticResource RowButton}"
@@ -81,25 +82,26 @@
                                     Cursor="Hand"
                                     ToolTip="{Binding TooltipText}"
                                     Opacity="{Binding RowOpacity}">
-                                <!-- HUD typography: two big columns + the avg chip; ranks
-                                     live in the tooltip and the dossier popup. -->
-                                <Grid Margin="10,0,8,0" Height="29">
+                                <!-- HUD typography; shared-size columns keep every row
+                                     aligned while the panel hugs its content. -->
+                                <Grid Margin="10,0,8,0" Height="32">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="46"/>
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerName"/>
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerRating"/>
+                                        <ColumnDefinition Width="50"/>
                                     </Grid.ColumnDefinitions>
 
                                     <!-- name + markers -->
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                                Margin="0,0,12,0">
                                         <TextBlock Text="{Binding Name}"
-                                                   FontSize="13.5" FontWeight="SemiBold"
+                                                   FontSize="15" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimary}"
                                                    TextTrimming="CharacterEllipsis"
-                                                   MaxWidth="138"/>
+                                                   MaxWidth="150"/>
                                         <TextBlock Text="you"
                                                    Visibility="{Binding LocalChipVisibility}"
-                                                   FontSize="10" FontWeight="SemiBold"
+                                                   FontSize="10.5" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource Accent}"
                                                    Margin="5,0,0,0" VerticalAlignment="Center"/>
                                         <Ellipse Width="6" Height="6"
@@ -107,7 +109,7 @@
                                                  Visibility="{Binding LiveVisibility}"
                                                  Margin="5,1,0,0" VerticalAlignment="Center"
                                                  ToolTip="Streaming live"/>
-                                        <TextBlock Text="☠" FontSize="11"
+                                        <TextBlock Text="☠" FontSize="12"
                                                    Foreground="{DynamicResource TextMuted}"
                                                    Margin="5,0,0,0" VerticalAlignment="Center"
                                                    Visibility="{Binding DeadVisibility}"/>
@@ -116,26 +118,27 @@
                                     <!-- rating: same size and contrast as the name -->
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding RatingText}"
-                                               FontSize="13.5" FontWeight="SemiBold"
+                                               FontSize="15" FontWeight="SemiBold"
                                                Foreground="{Binding RatingBrush}"
                                                VerticalAlignment="Center"
-                                               Margin="6,0"/>
+                                               HorizontalAlignment="Right"
+                                               Margin="0,0,8,0"/>
 
                                     <!-- avg placement chip -->
                                     <Border Grid.Column="2"
                                             Visibility="{Binding AvgVisibility}"
                                             Background="{Binding AvgBrush}"
-                                            CornerRadius="4" Padding="0,2"
+                                            CornerRadius="4" Padding="0,2.5"
                                             VerticalAlignment="Center"
                                             HorizontalAlignment="Stretch">
                                         <TextBlock Text="{Binding AvgText}"
-                                                   FontSize="12" FontWeight="Bold"
+                                                   FontSize="13" FontWeight="Bold"
                                                    Foreground="{Binding AvgTextBrush}"
                                                    HorizontalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Grid.Column="2"
                                                Visibility="{Binding NoDataVisibility}"
-                                               Text="–" FontSize="12"
+                                               Text="–" FontSize="13"
                                                Foreground="{DynamicResource TextMuted}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Grid>
