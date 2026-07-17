@@ -10,7 +10,7 @@ namespace MMRadar.Engine
     {
         public static List<PlayerSummary> Lobby()
         {
-            return new List<PlayerSummary>
+            var lobby = new List<PlayerSummary>
             {
                 new PlayerSummary { LobbyName = "beterbabbit", DisplayName = "beterbabbit", OnLeaderboard = true, PlayerId = 2827, Region = "NA", Rating = 18892, Rank = 2, DayAvg = 2.42, WeekAvg = 1.92, GamesToday = 13, GamesWeek = 48, IsLive = true, TwitchChannel = "beterbabbit" },
                 new PlayerSummary { LobbyName = "стоякбездела", DisplayName = "стоякбездела", OnLeaderboard = true, PlayerId = 3324, Region = "EU", Rating = 18715, Rank = 3, DayAvg = 2.97, WeekAvg = 3.05, GamesToday = 15, GamesWeek = 41 },
@@ -21,6 +21,20 @@ namespace MMRadar.Engine
                 new PlayerSummary { LobbyName = "RandomLegend", OnLeaderboard = false },
                 new PlayerSummary { LobbyName = "МишаТаверна", OnLeaderboard = false },
             };
+
+            // The chips must agree with the dossier: derive the aggregates from the
+            // same deterministic games Details() will generate for each player.
+            foreach (var s in lobby)
+            {
+                if (!s.OnLeaderboard)
+                    continue;
+                var details = Details(s);
+                s.WeekAvg = details.Week7Avg;
+                s.GamesWeek = details.Week7Count;
+                s.DayAvg = details.TodayAvg;
+                s.GamesToday = details.TodayCount;
+            }
+            return lobby;
         }
 
         public static PlayerDetails Details(PlayerSummary summary)
