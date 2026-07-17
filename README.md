@@ -12,10 +12,6 @@ A [Hearthstone Deck Tracker](https://hsreplay.net/downloads/) plugin for **Battl
 - 🫥 **Stays out of your way** — collapse the panel into a tiny ~30%-opacity pill; click the pill to expand, drag to move. Position, scale, and collapsed state persist.
 - 🧪 **Live preview** — show the overlay with the current world top-8 (real wallii data) to position and scale it without starting a game.
 
-| Player dossier | Collapsed pill |
-|---|---|
-| ![Dossier](artifacts/screenshot-top8.png) | ![Collapsed](artifacts/screenshot-collapsed.png) |
-
 ## Install
 
 1. Download `MMRadar.dll` from [Releases](../../releases) (or build it — see below) and drop it into:

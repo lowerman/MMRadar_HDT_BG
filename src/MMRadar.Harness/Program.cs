@@ -52,11 +52,9 @@ namespace MMRadar.Harness
             {
                 Title = "MMRadar Harness",
                 Width = 760,
-                Height = 640,
-                Background = new LinearGradientBrush(
-                    Color.FromRgb(0x14, 0x12, 0x0F),
-                    Color.FromRgb(0x24, 0x1E, 0x16),
-                    90),
+                Height = 680,
+                // GitHub dark-theme page color, so README screenshots blend in.
+                Background = new SolidColorBrush(Color.FromRgb(0x0D, 0x11, 0x17)),
                 Content = canvas,
             };
 
@@ -171,23 +169,61 @@ namespace MMRadar.Harness
 
         private static void SaveScreenshot(Window window, string path)
         {
-            var element = (FrameworkElement)window.Content;
-            var bitmap = new RenderTargetBitmap(
-                (int)element.ActualWidth, (int)element.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            var canvas = (Canvas)window.Content;
 
-            // render the window background + content together
-            var visual = new DrawingVisual();
-            using (var ctx = visual.RenderOpen())
+            // Crop to the union of the visible panels so screenshots have no dead space.
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = 0, maxY = 0;
+            foreach (FrameworkElement child in canvas.Children)
+            {
+                if (child.Visibility != Visibility.Visible || child.ActualWidth < 1)
+                    continue;
+                var left = Canvas.GetLeft(child);
+                var top = Canvas.GetTop(child);
+                if (double.IsNaN(left)) left = 0;
+                if (double.IsNaN(top)) top = 0;
+                var scale = (child.RenderTransform as ScaleTransform)?.ScaleX ?? 1.0;
+                minX = Math.Min(minX, left);
+                minY = Math.Min(minY, top);
+                maxX = Math.Max(maxX, left + child.ActualWidth * scale);
+                maxY = Math.Max(maxY, top + child.ActualHeight * scale);
+            }
+            if (maxX <= minX)
+            {
+                minX = 0; minY = 0; maxX = canvas.ActualWidth; maxY = canvas.ActualHeight;
+            }
+            const double pad = 20;
+            var x = Math.Max(0, minX - pad);
+            var y = Math.Max(0, minY - pad);
+            var w = Math.Min(canvas.ActualWidth, maxX + pad) - x;
+            var h = Math.Min(canvas.ActualHeight, maxY + pad) - y;
+
+            var debug = Environment.GetEnvironmentVariable("MMRADAR_SHOT_DEBUG");
+            if (!string.IsNullOrEmpty(debug))
+            {
+                var lines = new System.Text.StringBuilder();
+                lines.AppendLine($"canvas {canvas.ActualWidth}x{canvas.ActualHeight}");
+                foreach (FrameworkElement child in canvas.Children)
+                    lines.AppendLine($"child {child.GetType().Name} left={Canvas.GetLeft(child)} top={Canvas.GetTop(child)} aw={child.ActualWidth} ah={child.ActualHeight} ds={child.DesiredSize} rs={child.RenderSize}");
+                lines.AppendLine($"crop x={x} y={y} w={w} h={h}");
+                File.WriteAllText(debug, lines.ToString());
+            }
+
+            var bitmap = new RenderTargetBitmap(
+                (int)canvas.ActualWidth, (int)canvas.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            // Two Render passes compose 1:1 — a VisualBrush would stretch the content
+            // bounds to fill the bitmap and distort the proportions.
+            var background = new DrawingVisual();
+            using (var ctx = background.RenderOpen())
             {
                 ctx.DrawRectangle(window.Background, null,
-                    new Rect(0, 0, element.ActualWidth, element.ActualHeight));
-                ctx.DrawRectangle(new VisualBrush(element), null,
-                    new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+                    new Rect(0, 0, canvas.ActualWidth, canvas.ActualHeight));
             }
-            bitmap.Render(visual);
+            bitmap.Render(background);
+            bitmap.Render(canvas);
+            var cropped = new CroppedBitmap(bitmap, new Int32Rect((int)x, (int)y, (int)w, (int)h));
 
             var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            encoder.Frames.Add(BitmapFrame.Create(cropped));
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".");
             using (var stream = File.Create(path))
                 encoder.Save(stream);
