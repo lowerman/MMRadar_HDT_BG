@@ -55,7 +55,7 @@ namespace MMRadar.UI
             var k = _layoutScale;
             Resources["RowFontSize"] = 16.0 * k;
             Resources["ChipFontSize"] = 13.5 * k;
-            Resources["RowHeight"] = 33.0 * k;
+            Resources["RowHeight"] = 24.0 * k;
             Resources["NameMaxWidth"] = 150.0 * k;
             Resources["BadgeFontSize"] = 10.5 * k;
             Resources["MarkFontSize"] = 12.0 * k;
@@ -112,6 +112,9 @@ namespace MMRadar.UI
             Body.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             TitleRankPart.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             CollapseButton.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
+            HeaderContextText.Visibility = !_collapsed && _hasLobbyContext
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             RootBorder.MinWidth = _collapsed ? 0 : 192.0 * _layoutScale;
             Header.Cursor = _collapsed ? Cursors.Hand : Cursors.SizeAll;
             Header.ToolTip = _collapsed ? "Click to expand · drag to move" : null;
@@ -128,14 +131,14 @@ namespace MMRadar.UI
         public void ShowWaiting()
         {
             RowsControl.ItemsSource = _rows = new List<LobbyRowVm>();
-            LobbyContextText.Visibility = Visibility.Collapsed;
+            HeaderContextText.Visibility = Visibility.Collapsed;
             StatusText.Text = "Waiting for lobby…";
             StatusText.Visibility = Visibility.Visible;
         }
 
         public void ShowLoading(IReadOnlyList<LobbyPlayerInfo> players)
         {
-            LobbyContextText.Visibility = Visibility.Collapsed;
+            HeaderContextText.Visibility = Visibility.Collapsed;
             StatusText.Text = "Loading wallii.gg stats…";
             StatusText.Visibility = Visibility.Visible;
             _rows = players
@@ -165,7 +168,9 @@ namespace MMRadar.UI
             UpdateLobbyContext(summaries);
         }
 
-        /// <summary>One-line summary: average lobby rating and your delta to it.</summary>
+        private bool _hasLobbyContext;
+
+        /// <summary>Header summary: average lobby rating and your delta to it.</summary>
         private void UpdateLobbyContext(IReadOnlyList<PlayerSummary> summaries)
         {
             // Players confirmed below the leaderboard cutoff count as 8000 — an upper
@@ -176,34 +181,38 @@ namespace MMRadar.UI
             var known = summaries.Select(RatingOf).Where(r => r != null).Select(r => r.Value).ToList();
             if (known.Count < 2)
             {
-                LobbyContextText.Visibility = Visibility.Collapsed;
+                _hasLobbyContext = false;
+                HeaderContextText.Visibility = Visibility.Collapsed;
                 return;
             }
 
             var approximate = summaries.Any(s => s.BelowCutoff);
             var avg = (int)Math.Round(known.Average());
-            LobbyContextText.Inlines.Clear();
-            LobbyContextText.Inlines.Add(new System.Windows.Documents.Run(
-                $"lobby avg {(approximate ? "~" : "")}{UiHelpers.FormatRating(avg)}"));
-            LobbyContextText.ToolTip = approximate
-                ? "Players below the leaderboard cutoff are counted as 8 000"
-                : null;
+            HeaderContextText.Inlines.Clear();
+            HeaderContextText.Inlines.Add(new System.Windows.Documents.Run(
+                $"avg {(approximate ? "~" : "")}{UiHelpers.FormatRating(avg)}"));
+            HeaderContextText.ToolTip = "Average lobby rating" + (approximate
+                ? " (players below the leaderboard cutoff are counted as 8 000)"
+                : "");
 
             var local = summaries.FirstOrDefault(s => s.IsLocalPlayer);
             var localRating = local != null ? RatingOf(local) : null;
             if (localRating != null)
             {
                 var delta = localRating.Value - avg;
-                LobbyContextText.Inlines.Add(new System.Windows.Documents.Run("  ·  you "));
-                LobbyContextText.Inlines.Add(new System.Windows.Documents.Run(UiHelpers.FormatDelta(delta))
+                HeaderContextText.Inlines.Add(new System.Windows.Documents.Run(" · "));
+                HeaderContextText.Inlines.Add(new System.Windows.Documents.Run(UiHelpers.FormatDelta(delta))
                 {
                     Foreground = delta >= 0
                         ? UiHelpers.PlacementBrush(2)
                         : ThemeManager.Freeze(System.Windows.Media.Color.FromArgb(0xFF, 0xF8, 0x71, 0x71)),
                     FontWeight = FontWeights.SemiBold,
                 });
+                HeaderContextText.ToolTip += " · your delta to it";
             }
-            LobbyContextText.Visibility = Visibility.Visible;
+            _hasLobbyContext = true;
+            if (!IsCollapsed)
+                HeaderContextText.Visibility = Visibility.Visible;
         }
 
         public void SetStatus(string message)

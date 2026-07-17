@@ -16,7 +16,7 @@
             </ResourceDictionary.MergedDictionaries>
             <sys:Double x:Key="RowFontSize">16</sys:Double>
             <sys:Double x:Key="ChipFontSize">13.5</sys:Double>
-            <sys:Double x:Key="RowHeight">33</sys:Double>
+            <sys:Double x:Key="RowHeight">24</sys:Double>
             <sys:Double x:Key="NameMaxWidth">150</sys:Double>
             <sys:Double x:Key="BadgeFontSize">10.5</sys:Double>
             <sys:Double x:Key="MarkFontSize">12</sys:Double>
@@ -65,6 +65,12 @@
                             Style="{StaticResource IconButton}"
                             Content="–" Click="CollapseButton_Click"
                             ToolTip="Collapse into a small pill"/>
+                    <!-- lobby average + your delta live in the header to save a row -->
+                    <TextBlock x:Name="HeaderContextText" DockPanel.Dock="Right"
+                               FontSize="{DynamicResource CtxFontSize}"
+                               Foreground="{DynamicResource TextMuted}"
+                               VerticalAlignment="Center" Margin="0,0,8,0"
+                               Visibility="Collapsed"/>
                 </DockPanel>
             </Border>
 
@@ -77,14 +83,7 @@
                            Text="Waiting for lobby…"
                            Visibility="Collapsed"/>
 
-                <!-- One-line lobby context: average strength and your delta to it -->
-                <TextBlock x:Name="LobbyContextText"
-                           Margin="12,5,12,0"
-                           FontSize="{DynamicResource CtxFontSize}"
-                           Foreground="{DynamicResource TextMuted}"
-                           Visibility="Collapsed"/>
-
-                <ItemsControl x:Name="RowsControl" Margin="0,4" Grid.IsSharedSizeScope="True">
+                <ItemsControl x:Name="RowsControl" Margin="0,3" Grid.IsSharedSizeScope="True">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Style="{StaticResource RowButton}"
