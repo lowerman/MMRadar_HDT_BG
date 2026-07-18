@@ -225,26 +225,40 @@ namespace MMRadar.Game
             return 0;
         }
 
-        /// <summary>Fills hero card ids and live state (place / dead) from game entities.</summary>
+        /// <summary>Fills hero card ids, duos team ids and live state from game entities.</summary>
         public void AttachHeroEntities(List<LobbyPlayerInfo> players)
         {
             try
             {
-                var heroes = HdtCore.Game.Entities.Values
-                    .Where(e => e.IsHero && e.HasTag(GameTag.PLAYER_LEADERBOARD_PLACE) && e.HasTag(GameTag.PLAYER_ID))
-                    .ToList();
-                foreach (var hero in heroes)
+                // PlayerIds are unknown when the roster came from BattlegroundsLobbyInfo
+                // before Power.log was parsed — keep filling them in on every refresh,
+                // otherwise no entity (hero/team/dead) data can ever be matched.
+                ScanPowerLog();
+                foreach (var p in players)
+                    if (p.PlayerId == 0)
+                        p.PlayerId = FindPlayerId(p.Name);
+
+                foreach (var entity in HdtCore.Game.Entities.Values.ToList())
                 {
-                    var playerId = hero.GetTag(GameTag.PLAYER_ID);
+                    if (!entity.HasTag(GameTag.PLAYER_ID))
+                        continue;
+                    var playerId = entity.GetTag(GameTag.PLAYER_ID);
                     var player = players.FirstOrDefault(p => p.PlayerId == playerId);
                     if (player == null)
                         continue;
-                    if (string.IsNullOrEmpty(player.HeroCardId))
-                        player.HeroCardId = hero.CardId;
-                    player.LeaderboardPlace = hero.GetTag(GameTag.PLAYER_LEADERBOARD_PLACE);
-                    player.IsDead = hero.Health <= 0;
-                    if (hero.HasTag(GameTag.BACON_DUO_TEAM_ID))
-                        player.TeamId = hero.GetTag(GameTag.BACON_DUO_TEAM_ID);
+
+                    // The duos team id lives on player-type entities (heroes may not
+                    // carry it) — accept it from whichever entity has the tag.
+                    if (entity.HasTag(GameTag.BACON_DUO_TEAM_ID))
+                        player.TeamId = entity.GetTag(GameTag.BACON_DUO_TEAM_ID);
+
+                    if (entity.IsHero && entity.HasTag(GameTag.PLAYER_LEADERBOARD_PLACE))
+                    {
+                        if (string.IsNullOrEmpty(player.HeroCardId))
+                            player.HeroCardId = entity.CardId;
+                        player.LeaderboardPlace = entity.GetTag(GameTag.PLAYER_LEADERBOARD_PLACE);
+                        player.IsDead = entity.Health <= 0;
+                    }
                 }
             }
             catch (Exception ex)
