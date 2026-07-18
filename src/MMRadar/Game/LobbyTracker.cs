@@ -260,6 +260,22 @@ namespace MMRadar.Game
                         player.IsDead = entity.Health <= 0;
                     }
                 }
+
+                // Duos: teammates share one leaderboard tile slot — including BOTS,
+                // which often have no entity carrying BACON_DUO_TEAM_ID at all.
+                // Pair players by that slot, and if either member has a real team id,
+                // spread it to both so the pair never splits across key spaces.
+                if (HdtCore.Game.IsBattlegroundsDuosMatch)
+                {
+                    foreach (var slot in players
+                                 .Where(p => p.LeaderboardPlace > 0)
+                                 .GroupBy(p => p.LeaderboardPlace))
+                    {
+                        var teamId = slot.FirstOrDefault(p => p.TeamId > 0)?.TeamId ?? 1000 + slot.Key;
+                        foreach (var p in slot)
+                            p.TeamId = teamId;
+                    }
+                }
             }
             catch (Exception ex)
             {
