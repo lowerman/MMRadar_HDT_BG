@@ -11,6 +11,7 @@ A [Hearthstone Deck Tracker](https://hsreplay.net/downloads/) plugin for **Battl
 - 🔍 **Player dossier on click** — recent games (estimated placement, MMR delta, resulting MMR), averages over the last ~10 games / today / last 7 days (all computed from the same data, so they never contradict each other), and an MMR trajectory chart aligned with the game list.
 - 🔤 **HUD-grade readability** — big high-contrast type, an auto-width card that hugs its content, and resolution-aware scaling (1080p ×1.0, 1440p ×1.33, 4K ×2.0). Zooming re-renders the text, so it stays crisp at any size.
 - 🎨 **Three themes** — **HDT** (neutral grey matching the deck tracker — default), **Dark** (solid near-black, maximum contrast), **Warm** (blends with Hearthstone's look). Switch instantly in Settings.
+- 🤝 **Duos support** — teammates are grouped into pairs (alternating background bands, teams sorted by their strongest member) once the game reveals the teams; ratings, dossiers and the lobby average work in duos too.
 - 🫥 **Stays out of your way** — collapse the panel into a tiny ~30%-opacity pill <img src="artifacts/screenshot-collapsed.png" alt="collapsed pill" height="22">; click the pill to expand, drag to move. Position, scale, and collapsed state persist.
 - 🧪 **Live preview** — show the overlay with the current world top-8 (real wallii data) to position and scale it without starting a game.
 
