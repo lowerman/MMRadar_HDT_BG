@@ -175,15 +175,22 @@ namespace MMRadar.UI
                     .ToList();
                 var zebra = ThemeManager.Freeze(ThemeManager.Current.SubtleFill);
                 _rows = new List<LobbyRowVm>();
-                for (var i = 0; i < teams.Count; i++)
+                // Zebra applies only to REAL pairs (both rows share one band, bands
+                // alternate). Players whose team is not known yet stay untinted so
+                // they never break the two-row rhythm.
+                var pairIndex = 0;
+                foreach (var team in teams)
                 {
-                    foreach (var s in teams[i]
+                    var isPair = team.Count() >= 2;
+                    var tint = isPair && pairIndex % 2 == 1;
+                    if (isPair)
+                        pairIndex++;
+                    foreach (var s in team
                                  .OrderByDescending(EffectiveRating)
                                  .ThenBy(x => x.LobbyName, StringComparer.OrdinalIgnoreCase))
                     {
                         var vm = LobbyRowVm.From(s);
-                        // Both rows of a team share one background; bands alternate per team.
-                        if (i % 2 == 1)
+                        if (tint)
                             vm.RowBackground = zebra;
                         _rows.Add(vm);
                     }

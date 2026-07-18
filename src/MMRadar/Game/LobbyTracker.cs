@@ -261,21 +261,11 @@ namespace MMRadar.Game
                     }
                 }
 
-                // Duos: teammates share one leaderboard tile slot — including BOTS,
-                // which often have no entity carrying BACON_DUO_TEAM_ID at all.
-                // Pair players by that slot, and if either member has a real team id,
-                // spread it to both so the pair never splits across key spaces.
-                if (HdtCore.Game.IsBattlegroundsDuosMatch)
-                {
-                    foreach (var slot in players
-                                 .Where(p => p.LeaderboardPlace > 0)
-                                 .GroupBy(p => p.LeaderboardPlace))
-                    {
-                        var teamId = slot.FirstOrDefault(p => p.TeamId > 0)?.TeamId ?? 1000 + slot.Key;
-                        foreach (var p in slot)
-                            p.TeamId = teamId;
-                    }
-                }
+                // Note on duos: BACON_DUO_TEAM_ID lives on hero entities that are
+                // revealed progressively during the first minutes of the game, so
+                // team ids trickle in — the panel regroups as they become known.
+                // (Leaderboard slots are NOT shared by teammates, so they cannot
+                // be used to pair players.)
             }
             catch (Exception ex)
             {
