@@ -91,7 +91,7 @@ namespace MMRadar.Game
                 if (players == null)
                     return null;
 
-                AttachHeroEntities(players);
+                AttachHeroEntities(players, gameUuid);
 
                 return new LobbyState
                 {
@@ -276,10 +276,19 @@ namespace MMRadar.Game
         }
 
         /// <summary>Fills hero card ids, duos team ids and live state from game entities.</summary>
-        public void AttachHeroEntities(List<LobbyPlayerInfo> players)
+        /// <param name="gameUuid">Uuid of the lobby the roster belongs to (null when
+        /// resolved from Power.log) — gates the lobby-info hero refresh below.</param>
+        public void AttachHeroEntities(List<LobbyPlayerInfo> players, string gameUuid)
         {
             try
             {
+                // The roster is resolved as soon as all 8 NAMES are known — usually
+                // during hero select, when BattlegroundsLobbyInfo still has empty
+                // hero card ids for most players. The card ids fill in as players
+                // pick, and card-id matching below depends on them, so re-read them
+                // on every refresh (only from the same game's lobby info).
+                RefreshHeroCardIds(players, gameUuid);
+
                 // PlayerIds are unknown when the roster came from BattlegroundsLobbyInfo
                 // before Power.log was parsed — keep filling them in on every refresh,
                 // otherwise no entity (hero/team/dead) data can ever be matched.
@@ -370,6 +379,38 @@ namespace MMRadar.Game
                 case Region.ASIA: return "AP";
                 case Region.CHINA: return "CN";
                 default: return null;
+            }
+        }
+
+        /// <summary>
+        /// Re-reads hero card ids from BattlegroundsLobbyInfo for the CURRENT game
+        /// (uuid-gated so a stale previous-game lobby can never donate hero ids).
+        /// </summary>
+        private static void RefreshHeroCardIds(List<LobbyPlayerInfo> players, string gameUuid)
+        {
+            if (gameUuid == null)
+                return;
+            try
+            {
+                var lobbyInfo = HdtCore.Game.MetaData?.BattlegroundsLobbyInfo;
+                if (lobbyInfo?.Players == null || lobbyInfo.GameUuid != gameUuid)
+                    return;
+                foreach (var info in lobbyInfo.Players)
+                {
+                    if (string.IsNullOrEmpty(info.HeroCardId))
+                        continue;
+                    var name = StripTag(info.Name);
+                    if (name == null)
+                        continue;
+                    var player = players.FirstOrDefault(p =>
+                        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+                    if (player != null)
+                        player.HeroCardId = info.HeroCardId;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("RefreshHeroCardIds: " + ex.Message);
             }
         }
 

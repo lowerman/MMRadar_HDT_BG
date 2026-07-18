@@ -170,7 +170,7 @@ namespace MMRadar.Engine
                         _lastLiveRefresh = DateTime.UtcNow;
                         if (_lobby != null)
                         {
-                            _tracker.AttachHeroEntities(_lobby.Players);
+                            _tracker.AttachHeroEntities(_lobby.Players, _lobby.GameUuid);
                             _panel.UpdateLiveState(_lobby.Players);
                         }
                     }
