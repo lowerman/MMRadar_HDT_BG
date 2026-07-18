@@ -82,7 +82,12 @@ namespace MMRadar.Game
 
                 ScanPowerLog();
 
-                var players = TryFromLobbyInfo(localName) ?? TryFromPowerLog(localName);
+                var players = TryFromLobbyInfo(localName, out var gameUuid);
+                if (players == null)
+                {
+                    gameUuid = null;
+                    players = TryFromPowerLog(localName);
+                }
                 if (players == null)
                     return null;
 
@@ -93,6 +98,7 @@ namespace MMRadar.Game
                     Players = players,
                     Region = region,
                     GameMode = gameMode,
+                    GameUuid = gameUuid,
                 };
             }
             catch (Exception ex)
@@ -102,8 +108,9 @@ namespace MMRadar.Game
             }
         }
 
-        private List<LobbyPlayerInfo> TryFromLobbyInfo(string localName)
+        private List<LobbyPlayerInfo> TryFromLobbyInfo(string localName, out string gameUuid)
         {
+            gameUuid = null;
             var lobbyInfo = HdtCore.Game.MetaData?.BattlegroundsLobbyInfo;
             var lobbyPlayers = lobbyInfo?.Players;
             if (lobbyPlayers == null || lobbyPlayers.Count < 8)
@@ -117,8 +124,11 @@ namespace MMRadar.Game
             if (lobbyInfo.GameUuid != null && lobbyInfo.GameUuid == _consumedGameUuid)
             {
                 if (lobbyInfo.GameUuid == _lastLobbyUuid && _lastLobbyPlayers != null &&
-                    PowerLogConfirmsCachedRoster())
+                    (PowerLogConfirmsCachedRoster() || EntitiesConfirmCachedRoster()))
+                {
+                    gameUuid = _lastLobbyUuid;
                     return _lastLobbyPlayers.Select(CopyPlayer).ToList();
+                }
                 return null;
             }
 
@@ -144,6 +154,7 @@ namespace MMRadar.Game
             _consumedGameUuid = lobbyInfo.GameUuid;
             _lastLobbyUuid = lobbyInfo.GameUuid;
             _lastLobbyPlayers = result.Select(CopyPlayer).ToList();
+            gameUuid = lobbyInfo.GameUuid;
             return result;
         }
 
@@ -164,13 +175,52 @@ namespace MMRadar.Game
         {
             if (_namesByPlayerId.Count < 2)
                 return false; // too early to tell — wait for the log instead of guessing
+            // The local player appears in EVERY game's log (and in premade duos so
+            // does their partner), so only OTHER lobby members are real evidence
+            // that the log belongs to the remembered game and not a brand-new one.
             var overlap = _namesByPlayerId.Values.Count(n =>
-                _lastLobbyPlayers.Any(p => string.Equals(p.Name, n, StringComparison.OrdinalIgnoreCase)));
+                _lastLobbyPlayers.Any(p => !p.IsLocalPlayer &&
+                    string.Equals(p.Name, n, StringComparison.OrdinalIgnoreCase)));
             return overlap >= 2;
+        }
+
+        /// <summary>
+        /// Same-game check that works in duos, where the log names never confirm the
+        /// roster (only the local player is printed): the CURRENT game's hero
+        /// entities must overlap the remembered roster's hero cards.
+        /// </summary>
+        private bool EntitiesConfirmCachedRoster()
+        {
+            try
+            {
+                var cachedCards = new HashSet<string>(
+                    _lastLobbyPlayers.Select(p => NormalizeHeroCardId(p.HeroCardId)).Where(c => c != null),
+                    StringComparer.OrdinalIgnoreCase);
+                if (cachedCards.Count < 4)
+                    return false;
+                var hits = HdtCore.Game.Entities.Values.ToList()
+                    .Where(e => e.IsHero && e.HasTag(GameTag.PLAYER_ID))
+                    .Select(e => NormalizeHeroCardId(e.CardId))
+                    .Where(c => c != null)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count(cachedCards.Contains);
+                return hits >= 4;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("EntitiesConfirmCachedRoster: " + ex.Message);
+                return false;
+            }
         }
 
         private List<LobbyPlayerInfo> TryFromPowerLog(string localName)
         {
+            // In duos the log only ever prints the local player plus the tavern
+            // entity (which carries a bot-like name) — a "lobby" built from that
+            // would be a fake 2-player list, so duos trusts lobby info only.
+            if (HdtCore.Game.IsBattlegroundsDuosMatch && _namesByPlayerId.Count < 8)
+                return null;
+
             // All 8 lobby names are printed at game creation; accept a partial lobby
             // only later in the game so we do not show an incomplete list at turn 1.
             var haveAll = _namesByPlayerId.Count >= 8;
@@ -238,7 +288,32 @@ namespace MMRadar.Game
                     if (p.PlayerId == 0)
                         p.PlayerId = FindPlayerId(p.Name);
 
-                foreach (var entity in HdtCore.Game.Entities.Values.ToList())
+                var entities = HdtCore.Game.Entities.Values.ToList();
+
+                // In duos the ids Power.log prints ("PlayerID=15") and the PLAYER_ID
+                // tags on hero entities (1..8, the lobby slots) are DIFFERENT id
+                // spaces, and bots never reach the log at all — the hero card id from
+                // BattlegroundsLobbyInfo is the only anchor that works for all 8
+                // players. Adopt the hero entity's PLAYER_ID whenever the cards match.
+                foreach (var entity in entities)
+                {
+                    if (!entity.IsHero || !entity.HasTag(GameTag.PLAYER_ID))
+                        continue;
+                    var card = NormalizeHeroCardId(entity.CardId);
+                    if (card == null)
+                        continue;
+                    var player = players.FirstOrDefault(p =>
+                        card.Equals(NormalizeHeroCardId(p.HeroCardId), StringComparison.OrdinalIgnoreCase));
+                    if (player == null)
+                        continue;
+                    // Ghost copies of hero entities exist; the one actually on the
+                    // leaderboard (it has a place) is authoritative, any other copy
+                    // may only fill a still-unknown id.
+                    if (entity.HasTag(GameTag.PLAYER_LEADERBOARD_PLACE) || player.PlayerId == 0)
+                        player.PlayerId = entity.GetTag(GameTag.PLAYER_ID);
+                }
+
+                foreach (var entity in entities)
                 {
                     if (!entity.HasTag(GameTag.PLAYER_ID))
                         continue;
@@ -247,9 +322,14 @@ namespace MMRadar.Game
                     if (player == null)
                         continue;
 
-                    // The duos team id lives on player-type entities (heroes may not
-                    // carry it) — accept it from whichever entity has the tag.
-                    if (entity.HasTag(GameTag.BACON_DUO_TEAM_ID))
+                    // Accept the duos team id from any entity carrying it, EXCEPT
+                    // player-type entities for non-local players: their PLAYER_ID
+                    // tag lives in the log id space (e.g. 15 for the tavern), which
+                    // can collide with another player's hero-space id (1..8).
+                    // The local player's own PLAYER entity is the one place their
+                    // team id is guaranteed to appear — their hero may never get it.
+                    if (entity.HasTag(GameTag.BACON_DUO_TEAM_ID) &&
+                        (!entity.IsPlayer || player.IsLocalPlayer))
                         player.TeamId = entity.GetTag(GameTag.BACON_DUO_TEAM_ID);
 
                     if (entity.IsHero && entity.HasTag(GameTag.PLAYER_LEADERBOARD_PLACE))
@@ -261,9 +341,11 @@ namespace MMRadar.Game
                     }
                 }
 
-                // Note on duos: BACON_DUO_TEAM_ID lives on hero entities that are
-                // revealed progressively during the first minutes of the game, so
-                // team ids trickle in — the panel regroups as they become known.
+                // Note on duos: BACON_DUO_TEAM_ID sits on the hero entities of the
+                // other seven players (revealed progressively in a fresh game) and,
+                // for the LOCAL player only, on their PLAYER entity — the own hero
+                // may never carry it. Both are covered by the loop above since team
+                // ids are accepted from any entity with a PLAYER_ID tag.
                 // (Leaderboard slots are NOT shared by teammates, so they cannot
                 // be used to pair players.)
             }
@@ -289,6 +371,29 @@ namespace MMRadar.Game
                 case Region.CHINA: return "CN";
                 default: return null;
             }
+        }
+
+        /// <summary>
+        /// Hero card ids differ between sources: lobby info may hold the base hero
+        /// while the entity carries a skin (BG24_HERO_204 vs BG24_HERO_204_SKIN_E).
+        /// HDT's own mapping runs first (it knows non-conventional skins once its
+        /// remote data is loaded); the _SKIN_ suffix strip covers the rest.
+        /// </summary>
+        internal static string NormalizeHeroCardId(string cardId)
+        {
+            if (string.IsNullOrEmpty(cardId))
+                return null;
+            try
+            {
+                cardId = Hearthstone_Deck_Tracker.Hearthstone.BattlegroundsUtils
+                             .GetOriginalHeroId(cardId) ?? cardId;
+            }
+            catch
+            {
+                // remote data not loaded yet — the suffix strip below still applies
+            }
+            var idx = cardId.IndexOf("_SKIN_", StringComparison.OrdinalIgnoreCase);
+            return idx > 0 ? cardId.Substring(0, idx) : cardId;
         }
 
         internal static string StripTag(string name)

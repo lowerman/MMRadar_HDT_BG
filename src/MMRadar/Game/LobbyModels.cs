@@ -30,5 +30,12 @@ namespace MMRadar.Game
 
         /// <summary>wallii game_mode: "0" = solo, "1" = duos.</summary>
         public string GameMode { get; set; }
+
+        /// <summary>
+        /// GameUuid of the lobby info this roster came from (null when resolved
+        /// from Power.log). Lets the core detect that a roster accepted from
+        /// stale metadata belongs to a different game than the one now served.
+        /// </summary>
+        public string GameUuid { get; set; }
     }
 }

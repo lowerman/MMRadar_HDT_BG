@@ -187,13 +187,17 @@ namespace MMRadar.Engine
                     }
 
                     // A partial roster (e.g. right after a reconnect) keeps improving as
-                    // more names surface — upgrade the panel whenever we learn new ones.
-                    if (_phase == Phase.Loaded && _lobby != null && _lobby.Players.Count < 8 &&
+                    // more names surface, and a roster accepted from stale metadata is
+                    // replaced once HDT surfaces the real lobby of a NEW game (its
+                    // uuid differs from the one the current roster came from).
+                    if (_phase == Phase.Loaded && _lobby != null &&
                         (DateTime.UtcNow - _lastPartialLobbyRetry).TotalSeconds >= 5)
                     {
                         _lastPartialLobbyRetry = DateTime.UtcNow;
                         var better = _tracker.TryResolveLobby();
-                        if (better != null && better.Players.Count > _lobby.Players.Count)
+                        if (better != null &&
+                            (better.Players.Count > _lobby.Players.Count ||
+                             (better.GameUuid != null && better.GameUuid != _lobby.GameUuid)))
                         {
                             _lobby = better;
                             _phase = Phase.Fetching;

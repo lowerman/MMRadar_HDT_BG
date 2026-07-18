@@ -15,7 +15,7 @@ New-Item -ItemType Directory -Force $pluginsDir | Out-Null
 
 $hdtRunning = Get-Process "HearthstoneDeckTracker" -ErrorAction SilentlyContinue
 if ($hdtRunning) {
-    Write-Warning "Hearthstone Deck Tracker is running — the DLL may be locked. Close HDT and re-run if the copy fails."
+    Write-Warning "Hearthstone Deck Tracker is running - the DLL may be locked. Close HDT and re-run if the copy fails."
 }
 
 Copy-Item $dll $pluginsDir -Force
