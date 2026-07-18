@@ -86,7 +86,12 @@
                 <ItemsControl x:Name="RowsControl" Margin="0,3" Grid.IsSharedSizeScope="True">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Button Style="{StaticResource RowButton}"
+                            <StackPanel>
+                                <!-- duos: hairline between teams so pairs read as blocks -->
+                                <Border Height="1" Background="{DynamicResource DividerBrush}"
+                                        Margin="10,3,10,3"
+                                        Visibility="{Binding TeamSeparatorVisibility}"/>
+                                <Button Style="{StaticResource RowButton}"
                                     Click="Row_Click"
                                     Tag="{Binding}"
                                     Cursor="Hand"
@@ -148,7 +153,8 @@
                                                Foreground="{DynamicResource TextMuted}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Grid>
-                            </Button>
+                                </Button>
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

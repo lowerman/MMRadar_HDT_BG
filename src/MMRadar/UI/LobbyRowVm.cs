@@ -14,8 +14,11 @@ namespace MMRadar.UI
         public string Name { get; set; }
         public Brush NameBrush { get; set; }
 
-        /// <summary>Subtle zebra tint alternating per duos team (transparent in solo).</summary>
+        /// <summary>Optional per-row background (transparent by default).</summary>
         public Brush RowBackground { get; set; } = Brushes.Transparent;
+
+        /// <summary>Thin divider above the first row of each duos team (except the first).</summary>
+        public Visibility TeamSeparatorVisibility { get; set; } = Visibility.Collapsed;
         public bool IsLocal { get; set; }
         public bool HasStats { get; set; }
         public string RatingText { get; set; }
