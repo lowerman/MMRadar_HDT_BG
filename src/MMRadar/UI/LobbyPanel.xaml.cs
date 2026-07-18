@@ -165,32 +165,27 @@ namespace MMRadar.UI
             _lastStatus = null;
             StatusText.Visibility = Visibility.Collapsed;
 
-            if (summaries.Any(s => s.TeamId > 0))
+            // Duos grouping activates only once EVERY player's team is known (the
+            // team tags trickle in as heroes get revealed) — so the panel is either
+            // a clean list or perfect two-row bands, never a half-grouped mess.
+            if (summaries.Count > 0 && summaries.All(s => s.TeamId > 0))
             {
-                // Duos: keep teammates together — teams ordered by their strongest
-                // member, a thin divider between teams so pairs read as blocks.
+                // Teams ordered by their strongest member; both rows of a pair share
+                // one background, bands alternate per team.
                 var teams = summaries
-                    .GroupBy(s => s.TeamId > 0 ? "t" + s.TeamId : "solo:" + s.LobbyName)
+                    .GroupBy(s => s.TeamId)
                     .OrderByDescending(g => g.Max(EffectiveRating))
                     .ToList();
                 var zebra = ThemeManager.Freeze(ThemeManager.Current.SubtleFill);
                 _rows = new List<LobbyRowVm>();
-                // Zebra applies only to REAL pairs (both rows share one band, bands
-                // alternate). Players whose team is not known yet stay untinted so
-                // they never break the two-row rhythm.
-                var pairIndex = 0;
-                foreach (var team in teams)
+                for (var i = 0; i < teams.Count; i++)
                 {
-                    var isPair = team.Count() >= 2;
-                    var tint = isPair && pairIndex % 2 == 1;
-                    if (isPair)
-                        pairIndex++;
-                    foreach (var s in team
+                    foreach (var s in teams[i]
                                  .OrderByDescending(EffectiveRating)
                                  .ThenBy(x => x.LobbyName, StringComparer.OrdinalIgnoreCase))
                     {
                         var vm = LobbyRowVm.From(s);
-                        if (tint)
+                        if (i % 2 == 1)
                             vm.RowBackground = zebra;
                         _rows.Add(vm);
                     }
