@@ -123,6 +123,9 @@ namespace MMRadar.Wallii
         public string HeroCardId { get; set; }
         public int GamePlayerId { get; set; }
 
+        /// <summary>Duos team id (0 = unknown / solo game).</summary>
+        public int TeamId { get; set; }
+
         /// <summary>
         /// Rating from the full official leaderboard for players wallii does not track
         /// (wallii covers only the very top of the ladder).

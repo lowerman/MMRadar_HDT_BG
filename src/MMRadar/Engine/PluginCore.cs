@@ -242,6 +242,7 @@ namespace MMRadar.Engine
                     summary.IsLocalPlayer = player.IsLocalPlayer;
                     summary.HeroCardId = player.HeroCardId;
                     summary.GamePlayerId = player.PlayerId;
+                    summary.TeamId = player.TeamId;
                 }
             }
 

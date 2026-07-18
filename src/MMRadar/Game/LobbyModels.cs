@@ -16,6 +16,9 @@ namespace MMRadar.Game
 
         /// <summary>Current in-game leaderboard place (1-8, 0 when unknown).</summary>
         public int LeaderboardPlace { get; set; }
+
+        /// <summary>Duos team id (0 when unknown or solo).</summary>
+        public int TeamId { get; set; }
     }
 
     public class LobbyState

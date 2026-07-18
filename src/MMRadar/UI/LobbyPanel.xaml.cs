@@ -156,17 +156,47 @@ namespace MMRadar.UI
             RowsControl.ItemsSource = _rows;
         }
 
+        private static int EffectiveRating(PlayerSummary s) =>
+            s.OnLeaderboard ? s.Rating : s.FallbackRating ?? (s.BelowCutoff ? 1 : 0);
+
         public void SetStats(IReadOnlyList<PlayerSummary> summaries)
         {
             _lastSummaries = summaries;
             _lastStatus = null;
             StatusText.Visibility = Visibility.Collapsed;
-            // Real ratings first (desc), then below-cutoff players, then unknowns.
-            _rows = summaries
-                .OrderByDescending(s => s.OnLeaderboard ? s.Rating : s.FallbackRating ?? (s.BelowCutoff ? 1 : 0))
-                .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
-                .Select(LobbyRowVm.From)
-                .ToList();
+
+            if (summaries.Any(s => s.TeamId > 0))
+            {
+                // Duos: keep teammates together — teams ordered by their strongest
+                // member, every other team gets a subtle zebra tint.
+                var teams = summaries
+                    .GroupBy(s => s.TeamId > 0 ? "t" + s.TeamId : "solo:" + s.LobbyName)
+                    .OrderByDescending(g => g.Max(EffectiveRating))
+                    .ToList();
+                var zebra = ThemeManager.Freeze(ThemeManager.Current.SubtleFill);
+                _rows = new List<LobbyRowVm>();
+                for (var i = 0; i < teams.Count; i++)
+                {
+                    foreach (var s in teams[i]
+                                 .OrderByDescending(EffectiveRating)
+                                 .ThenBy(x => x.LobbyName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        var vm = LobbyRowVm.From(s);
+                        if (i % 2 == 1)
+                            vm.RowBackground = zebra;
+                        _rows.Add(vm);
+                    }
+                }
+            }
+            else
+            {
+                // Solo: real ratings first (desc), then below-cutoff, then unknowns.
+                _rows = summaries
+                    .OrderByDescending(EffectiveRating)
+                    .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
+                    .Select(LobbyRowVm.From)
+                    .ToList();
+            }
             RowsControl.ItemsSource = _rows;
             UpdateLobbyContext(summaries);
         }
@@ -225,16 +255,26 @@ namespace MMRadar.UI
             StatusText.Visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        /// <summary>Updates dead/alive greying from the in-game state.</summary>
+        /// <summary>Updates dead/alive greying and picks up duos team ids as they appear.</summary>
         public void UpdateLiveState(IReadOnlyList<LobbyPlayerInfo> players)
         {
+            var teamsChanged = false;
             foreach (var row in _rows)
             {
                 var match = players.FirstOrDefault(p =>
                     string.Equals(p.Name, row.Summary?.LobbyName ?? row.Name, StringComparison.OrdinalIgnoreCase));
-                if (match != null)
-                    row.IsDead = match.IsDead;
+                if (match == null)
+                    continue;
+                row.IsDead = match.IsDead;
+                if (row.Summary != null && match.TeamId > 0 && row.Summary.TeamId != match.TeamId)
+                {
+                    row.Summary.TeamId = match.TeamId;
+                    teamsChanged = true;
+                }
             }
+            // Team ids often surface a bit after the first render — regroup once known.
+            if (teamsChanged && _lastSummaries != null)
+                SetStats(_lastSummaries);
         }
 
         // --- window chrome ---

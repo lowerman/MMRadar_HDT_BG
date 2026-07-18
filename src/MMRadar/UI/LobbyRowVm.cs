@@ -13,6 +13,9 @@ namespace MMRadar.UI
 
         public string Name { get; set; }
         public Brush NameBrush { get; set; }
+
+        /// <summary>Subtle zebra tint alternating per duos team (transparent in solo).</summary>
+        public Brush RowBackground { get; set; } = Brushes.Transparent;
         public bool IsLocal { get; set; }
         public bool HasStats { get; set; }
         public string RatingText { get; set; }

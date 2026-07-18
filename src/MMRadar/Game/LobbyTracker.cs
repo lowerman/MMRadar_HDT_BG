@@ -243,6 +243,8 @@ namespace MMRadar.Game
                         player.HeroCardId = hero.CardId;
                     player.LeaderboardPlace = hero.GetTag(GameTag.PLAYER_LEADERBOARD_PLACE);
                     player.IsDead = hero.Health <= 0;
+                    if (hero.HasTag(GameTag.BACON_DUO_TEAM_ID))
+                        player.TeamId = hero.GetTag(GameTag.BACON_DUO_TEAM_ID);
                 }
             }
             catch (Exception ex)

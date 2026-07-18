@@ -28,6 +28,7 @@ namespace MMRadar.Harness
             string shotPath = null;
             string liveNames = null;
             var top = false;
+            var duo = false;
             var collapsed = false;
             var region = "EU";
             var mode = "0";
@@ -38,6 +39,7 @@ namespace MMRadar.Harness
                     case "--shot": shotPath = args[++i]; break;
                     case "--live": liveNames = args[++i]; break;
                     case "--top": top = true; break;
+                    case "--duo": duo = true; break;
                     case "--collapsed": collapsed = true; break;
                     case "--theme": MMRadar.UI.ThemeManager.Apply(args[++i]); break;
                     case "--region": region = args[++i]; break;
@@ -136,6 +138,13 @@ namespace MMRadar.Harness
                     else
                     {
                         var lobby = SampleData.Lobby();
+                        if (duo)
+                        {
+                            // Fabricate duos pairs to preview the team grouping.
+                            var teams = new[] { 1, 3, 2, 1, 4, 2, 3, 4 };
+                            for (var i = 0; i < lobby.Count && i < teams.Length; i++)
+                                lobby[i].TeamId = teams[i];
+                        }
                         panel.SetStats(lobby);
                         popup.SetData(SampleData.Details(lobby[0]));
                     }

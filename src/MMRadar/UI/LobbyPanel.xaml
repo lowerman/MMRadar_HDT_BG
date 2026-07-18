@@ -91,6 +91,7 @@
                                     Tag="{Binding}"
                                     Cursor="Hand"
                                     ToolTip="{Binding TooltipText}"
+                                    Background="{Binding RowBackground}"
                                     Opacity="{Binding RowOpacity}">
                                 <!-- HUD typography; shared-size columns keep every row
                                      aligned while the panel hugs its content. -->
