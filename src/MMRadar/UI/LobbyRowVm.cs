@@ -12,6 +12,7 @@ namespace MMRadar.UI
         public PlayerSummary Summary { get; set; }
 
         public string Name { get; set; }
+        public Brush NameBrush { get; set; }
         public bool IsLocal { get; set; }
         public bool HasStats { get; set; }
         public string RatingText { get; set; }
@@ -22,7 +23,6 @@ namespace MMRadar.UI
         public bool IsLive { get; set; }
         public string TooltipText { get; set; }
 
-        public Visibility LocalChipVisibility => IsLocal ? Visibility.Visible : Visibility.Collapsed;
         public Visibility LiveVisibility => IsLive ? Visibility.Visible : Visibility.Collapsed;
         public Visibility AvgVisibility => HasStats ? Visibility.Visible : Visibility.Collapsed;
         public Visibility NoDataVisibility => HasStats ? Visibility.Collapsed : Visibility.Visible;
@@ -51,10 +51,15 @@ namespace MMRadar.UI
 
         public static LobbyRowVm From(PlayerSummary s)
         {
+            // Your own row shows a plain gold "you" instead of your (possibly long)
+            // nickname — you know who you are, and the panel stays narrow.
             var vm = new LobbyRowVm
             {
                 Summary = s,
-                Name = s.DisplayName ?? s.LobbyName,
+                Name = s.IsLocalPlayer ? "you" : s.DisplayName ?? s.LobbyName,
+                NameBrush = s.IsLocalPlayer
+                    ? ThemeManager.Freeze(ThemeManager.Current.Accent)
+                    : ThemeManager.Freeze(ThemeManager.Current.TextPrimary),
                 IsLocal = s.IsLocalPlayer,
                 HasStats = s.OnLeaderboard,
                 IsLive = s.IsLive,

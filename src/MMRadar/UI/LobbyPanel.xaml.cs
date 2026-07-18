@@ -144,7 +144,10 @@ namespace MMRadar.UI
             _rows = players
                 .Select(p => new LobbyRowVm
                 {
-                    Name = p.Name,
+                    Name = p.IsLocalPlayer ? "you" : p.Name,
+                    NameBrush = p.IsLocalPlayer
+                        ? ThemeManager.Freeze(ThemeManager.Current.Accent)
+                        : ThemeManager.Freeze(ThemeManager.Current.TextPrimary),
                     IsLocal = p.IsLocalPlayer,
                     HasStats = false,
                     RatingText = "…",

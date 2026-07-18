@@ -55,23 +55,24 @@ namespace MMRadar.UI
             FilledChips = true,
         };
 
-        public static readonly ThemePalette Glass = new ThemePalette
+        /// <summary>Neutral grey matching HDT's own panels and the classic BGRank look.</summary>
+        public static readonly ThemePalette Hdt = new ThemePalette
         {
-            Key = "glass",
-            DisplayName = "Glass",
-            Description = "translucent and airy",
-            PanelBackground = FromHex("#C217181B"),
-            PanelBorder = FromHex("#24FFFFFF"),
-            TextPrimary = FromHex("#FFF4F6F8"),
-            TextSecondary = FromHex("#FFAEB4BB"),
-            TextMuted = FromHex("#FF7C828A"),
-            RatingText = FromHex("#FFEDF1F5"),
-            Accent = FromHex("#FFE6C377"),
-            ChipBackground = FromHex("#1CFFFFFF"),
-            RowHover = FromHex("#12FFFFFF"),
-            Divider = FromHex("#12FFFFFF"),
-            SubtleFill = FromHex("#0AFFFFFF"),
-            FilledChips = false,
+            Key = "hdt",
+            DisplayName = "HDT",
+            Description = "matches the deck tracker",
+            PanelBackground = FromHex("#FA262626"),
+            PanelBorder = FromHex("#2EFFFFFF"),
+            TextPrimary = FromHex("#FFF2F2F2"),
+            TextSecondary = FromHex("#FFB8B8B8"),
+            TextMuted = FromHex("#FF868686"),
+            RatingText = FromHex("#FFECECEC"),
+            Accent = FromHex("#FFCFAF6E"),
+            ChipBackground = FromHex("#24FFFFFF"),
+            RowHover = FromHex("#16FFFFFF"),
+            Divider = FromHex("#1AFFFFFF"),
+            SubtleFill = FromHex("#10FFFFFF"),
+            FilledChips = true,
         };
 
         public static readonly ThemePalette Hearthstone = new ThemePalette
@@ -94,7 +95,7 @@ namespace MMRadar.UI
         };
 
         public static readonly IReadOnlyList<ThemePalette> All =
-            new[] { Dark, Glass, Hearthstone };
+            new[] { Dark, Hdt, Hearthstone };
 
         public static ThemePalette Current { get; private set; } = Dark;
 

@@ -63,15 +63,15 @@
                     <TextBlock Text="Dark" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
             </Button>
-            <Button x:Name="ThemeGlassButton" Style="{StaticResource ThemeButton}" Click="ThemeGlass_Click"
-                    ToolTip="Translucent — light and airy">
+            <Button x:Name="ThemeHdtButton" Style="{StaticResource ThemeButton}" Click="ThemeHdt_Click"
+                    ToolTip="Neutral grey — matches HDT's own panels">
                 <StackPanel>
-                    <Border Width="34" Height="18" CornerRadius="4" Background="#8017181B"
-                            BorderBrush="#33FFFFFF" BorderThickness="1" HorizontalAlignment="Center">
-                        <Border Width="14" Height="6" CornerRadius="2" Background="#4D3DD08F"
+                    <Border Width="34" Height="18" CornerRadius="4" Background="#FF262626"
+                            BorderBrush="#4DFFFFFF" BorderThickness="1" HorizontalAlignment="Center">
+                        <Border Width="14" Height="6" CornerRadius="2" Background="#FFCFAF6E"
                                 HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0"/>
                     </Border>
-                    <TextBlock Text="Glass" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                    <TextBlock Text="HDT" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
             </Button>
             <Button x:Name="ThemeHsButton" Style="{StaticResource ThemeButton}" Click="ThemeHs_Click"

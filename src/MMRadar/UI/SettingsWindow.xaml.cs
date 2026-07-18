@@ -34,7 +34,7 @@ namespace MMRadar.UI
 
         private void ThemeDark_Click(object sender, RoutedEventArgs e) => SelectTheme("dark");
 
-        private void ThemeGlass_Click(object sender, RoutedEventArgs e) => SelectTheme("glass");
+        private void ThemeHdt_Click(object sender, RoutedEventArgs e) => SelectTheme("hdt");
 
         private void ThemeHs_Click(object sender, RoutedEventArgs e) => SelectTheme("hearthstone");
 
@@ -48,7 +48,7 @@ namespace MMRadar.UI
         {
             var gold = (Brush)Resources["AccentGold"];
             Mark(ThemeDarkButton, key == "dark", gold);
-            Mark(ThemeGlassButton, key == "glass", gold);
+            Mark(ThemeHdtButton, key == "hdt", gold);
             Mark(ThemeHsButton, key == "hearthstone", gold);
         }
 

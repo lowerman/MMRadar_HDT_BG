@@ -106,14 +106,9 @@
                                                 Margin="0,0,12,0">
                                         <TextBlock Text="{Binding Name}"
                                                    FontSize="{DynamicResource RowFontSize}" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   Foreground="{Binding NameBrush}"
                                                    TextTrimming="CharacterEllipsis"
                                                    MaxWidth="{DynamicResource NameMaxWidth}"/>
-                                        <TextBlock Text="you"
-                                                   Visibility="{Binding LocalChipVisibility}"
-                                                   FontSize="{DynamicResource BadgeFontSize}" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource Accent}"
-                                                   Margin="5,0,0,0" VerticalAlignment="Center"/>
                                         <Ellipse Width="{DynamicResource DotSize}" Height="{DynamicResource DotSize}"
                                                  Fill="{StaticResource LiveRed}"
                                                  Visibility="{Binding LiveVisibility}"
