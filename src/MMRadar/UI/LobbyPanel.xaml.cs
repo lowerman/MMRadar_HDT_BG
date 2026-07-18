@@ -173,18 +173,18 @@ namespace MMRadar.UI
                     .GroupBy(s => s.TeamId > 0 ? "t" + s.TeamId : "solo:" + s.LobbyName)
                     .OrderByDescending(g => g.Max(EffectiveRating))
                     .ToList();
+                var zebra = ThemeManager.Freeze(ThemeManager.Current.SubtleFill);
                 _rows = new List<LobbyRowVm>();
                 for (var i = 0; i < teams.Count; i++)
                 {
-                    var first = true;
                     foreach (var s in teams[i]
                                  .OrderByDescending(EffectiveRating)
                                  .ThenBy(x => x.LobbyName, StringComparer.OrdinalIgnoreCase))
                     {
                         var vm = LobbyRowVm.From(s);
-                        if (first && i > 0)
-                            vm.TeamSeparatorVisibility = Visibility.Visible;
-                        first = false;
+                        // Both rows of a team share one background; bands alternate per team.
+                        if (i % 2 == 1)
+                            vm.RowBackground = zebra;
                         _rows.Add(vm);
                     }
                 }
