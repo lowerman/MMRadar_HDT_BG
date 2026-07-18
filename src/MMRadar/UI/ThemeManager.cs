@@ -97,7 +97,7 @@ namespace MMRadar.UI
         public static readonly IReadOnlyList<ThemePalette> All =
             new[] { Dark, Hdt, Hearthstone };
 
-        public static ThemePalette Current { get; private set; } = Dark;
+        public static ThemePalette Current { get; private set; } = Hdt;
 
         /// <summary>Raised after the current theme changes; UI re-applies its resources.</summary>
         public static event Action ThemeChanged;
@@ -106,7 +106,7 @@ namespace MMRadar.UI
         {
             Current = All.FirstOrDefault(t =>
                           string.Equals(t.Key, key, StringComparison.OrdinalIgnoreCase))
-                      ?? Dark;
+                      ?? Hdt;
             try
             {
                 ThemeChanged?.Invoke();

@@ -450,8 +450,10 @@ namespace MMRadar.Engine
         }
 
         /// <summary>
-        /// Auto mode: match the game-window resolution so the panel keeps the same
-        /// on-screen proportion everywhere (1080p ×1.0, 1440p ×1.33, 4K ×2.0).
+        /// Auto mode: compensate for higher game-window resolutions with a DAMPED curve
+        /// (1080p ×1.0, 1440p ×1.2, 4K ×1.6). Full proportionality made sense with the
+        /// original small typography; the current 16px HUD type only needs to recover
+        /// the physical size lost to pixel density, not the full resolution ratio.
         /// Only runs once the overlay window has been sized to the real game window,
         /// and is never persisted — the user's own wheel-zoom takes over for good.
         /// </summary>
@@ -464,7 +466,8 @@ namespace MMRadar.Engine
                 var width = HdtCore.OverlayWindow.ActualWidth;
                 if (width < 1000)
                     return; // overlay not sized to the game yet
-                var auto = Math.Max(1.0, Math.Min(width / 1920.0, 2.0));
+                var auto = 1.0 + (width / 1920.0 - 1.0) * 0.6;
+                auto = Math.Max(1.0, Math.Min(auto, 1.6));
                 if (Math.Abs(_panel.PanelScale - auto) < 0.01)
                     return;
                 _panel.PanelScale = auto;

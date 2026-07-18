@@ -14,7 +14,7 @@ namespace MMRadar.Config
         public double Scale { get; set; } = 0;
         public bool OverlayEnabled { get; set; } = true;
         public bool Collapsed { get; set; }
-        public string Theme { get; set; } = "dark";
+        public string Theme { get; set; } = "hdt";
         public int RecentGamesCount { get; set; } = 10;
 
         /// <summary>Optional overrides in case the wallii Supabase URL or anon key rotates.</summary>
