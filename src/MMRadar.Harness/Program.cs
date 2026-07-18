@@ -32,6 +32,7 @@ namespace MMRadar.Harness
             var collapsed = false;
             var region = "EU";
             var mode = "0";
+            var scale = 1.0;
             for (var i = 0; i < args.Length; i++)
             {
                 switch (args[i])
@@ -44,6 +45,9 @@ namespace MMRadar.Harness
                     case "--theme": MMRadar.UI.ThemeManager.Apply(args[++i]); break;
                     case "--region": region = args[++i]; break;
                     case "--mode": mode = args[++i]; break;
+                    case "--scale":
+                        scale = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
+                        break;
                 }
             }
 
@@ -53,18 +57,18 @@ namespace MMRadar.Harness
             var window = new Window
             {
                 Title = "MMRadar Harness",
-                Width = 760,
-                Height = 680,
+                Width = 760 * Math.Max(1.0, scale),
+                Height = 680 * Math.Max(1.0, scale),
                 // GitHub dark-theme page color, so README screenshots blend in.
                 Background = new SolidColorBrush(Color.FromRgb(0x0D, 0x11, 0x17)),
                 Content = canvas,
             };
 
-            var panel = new LobbyPanel();
-            var popup = new PlayerDetailsPopup();
+            var panel = new LobbyPanel { PanelScale = scale };
+            var popup = new PlayerDetailsPopup { PanelScale = scale };
             Canvas.SetLeft(panel, 24);
             Canvas.SetTop(panel, 24);
-            Canvas.SetLeft(popup, 396);
+            Canvas.SetLeft(popup, Math.Max(396, 396 * scale));
             Canvas.SetTop(popup, 24);
             canvas.Children.Add(panel);
             canvas.Children.Add(popup);

@@ -39,21 +39,24 @@ namespace MMRadar.UI
         private void ApplyLayoutScale()
         {
             var k = _layoutScale;
-            Resources["PopupWidth"] = 280.0 * k;
-            Resources["PNameFont"] = 15.0 * k;
-            Resources["PSubFont"] = 11.0 * k;
-            Resources["PStatusFont"] = 12.0 * k;
-            Resources["PCapFont"] = 9.5 * k;
-            Resources["PBigCapFont"] = 10.0 * k;
-            Resources["PBigFont"] = 22.0 * k;
-            Resources["PValFont"] = 12.5 * k;
-            Resources["PGameFont"] = 12.0 * k;
-            Resources["PGameChipFont"] = 11.5 * k;
-            Resources["PChartHeight"] = 36.0 * k;
-            Resources["PBadgeFont"] = 10.0 * k;
-            Resources["PColTime"] = new GridLength(80.0 * k);
-            Resources["PColChip"] = new GridLength(36.0 * k);
-            Resources["PColDelta"] = new GridLength(52.0 * k);
+            // Whole-pixel metrics only: fractional font sizes make Display-mode
+            // ClearType hint digit advances unevenly (see LobbyPanel).
+            double R(double v) => Math.Max(1.0, Math.Round(v));
+            Resources["PopupWidth"] = R(280.0 * k);
+            Resources["PNameFont"] = R(15.0 * k);
+            Resources["PSubFont"] = R(11.0 * k);
+            Resources["PStatusFont"] = R(12.0 * k);
+            Resources["PCapFont"] = R(9.5 * k);
+            Resources["PBigCapFont"] = R(10.0 * k);
+            Resources["PBigFont"] = R(22.0 * k);
+            Resources["PValFont"] = R(12.5 * k);
+            Resources["PGameFont"] = R(12.0 * k);
+            Resources["PGameChipFont"] = R(11.5 * k);
+            Resources["PChartHeight"] = R(36.0 * k);
+            Resources["PBadgeFont"] = R(10.0 * k);
+            Resources["PColTime"] = new GridLength(R(80.0 * k));
+            Resources["PColChip"] = new GridLength(R(36.0 * k));
+            Resources["PColDelta"] = new GridLength(R(52.0 * k));
         }
 
         private class GameRowVm

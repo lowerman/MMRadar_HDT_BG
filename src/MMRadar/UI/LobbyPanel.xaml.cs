@@ -53,18 +53,24 @@ namespace MMRadar.UI
         private void ApplyLayoutScale()
         {
             var k = _layoutScale;
-            Resources["RowFontSize"] = 16.0 * k;
-            Resources["ChipFontSize"] = 13.5 * k;
-            Resources["RowHeight"] = 24.0 * k;
-            Resources["NameMaxWidth"] = 150.0 * k;
-            Resources["BadgeFontSize"] = 10.5 * k;
-            Resources["MarkFontSize"] = 12.0 * k;
-            Resources["DotSize"] = 6.0 * k;
-            Resources["TitleFontSize"] = 11.0 * k;
-            Resources["CtxFontSize"] = 11.0 * k;
-            Resources["StatusFontSize"] = 11.5 * k;
-            Resources["ChipColWidth"] = new GridLength(52.0 * k);
-            RootBorder.MinWidth = _collapsed ? 0 : 192.0 * k;
+            // Display-mode ClearType hints every glyph to the pixel grid; at
+            // FRACTIONAL font sizes (e.g. 16 × 1.2 = 19.2) the hinted digit
+            // advances stop being uniform, so the rating digits drift out of
+            // their columns row by row. Rounding every scaled metric to whole
+            // pixels keeps the type both crisp and columnar.
+            double R(double v) => Math.Max(1.0, Math.Round(v));
+            Resources["RowFontSize"] = R(16.0 * k);
+            Resources["ChipFontSize"] = R(13.5 * k);
+            Resources["RowHeight"] = R(24.0 * k);
+            Resources["NameMaxWidth"] = R(150.0 * k);
+            Resources["BadgeFontSize"] = R(10.5 * k);
+            Resources["MarkFontSize"] = R(12.0 * k);
+            Resources["DotSize"] = R(6.0 * k);
+            Resources["TitleFontSize"] = R(11.0 * k);
+            Resources["CtxFontSize"] = R(11.0 * k);
+            Resources["StatusFontSize"] = R(11.5 * k);
+            Resources["ChipColWidth"] = new GridLength(R(52.0 * k));
+            RootBorder.MinWidth = _collapsed ? 0 : R(192.0 * k);
         }
 
         private IReadOnlyList<PlayerSummary> _lastSummaries;
@@ -115,7 +121,7 @@ namespace MMRadar.UI
             HeaderContextText.Visibility = !_collapsed && _hasLobbyContext
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            RootBorder.MinWidth = _collapsed ? 0 : 192.0 * _layoutScale;
+            RootBorder.MinWidth = _collapsed ? 0 : Math.Round(192.0 * _layoutScale);
             Header.Cursor = _collapsed ? Cursors.Hand : Cursors.SizeAll;
             Header.ToolTip = _collapsed ? "Click to expand · drag to move" : null;
             UpdateIdleOpacity();
