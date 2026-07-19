@@ -51,6 +51,7 @@ namespace MMRadar.Engine
         private SettingsWindow _settingsWindow;
         private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
         private bool _spectateNoticeShown;
+        private System.Windows.Threading.DispatcherTimer _saveDebounce;
 
         /// <summary>True once the user has chosen an explicit scale (mouse wheel).</summary>
         private bool _scaleTouched;
@@ -63,6 +64,17 @@ namespace MMRadar.Engine
 
             var dir = Path.Combine(HdtConfig.AppDataPath, "MMRadar");
             _settings = PluginSettings.Load(dir);
+            // Wheel-zoom raises LayoutChanged on every notch; an XML write per
+            // notch can stutter on slow disks. Collect the burst, write once.
+            _saveDebounce = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(500),
+            };
+            _saveDebounce.Tick += (s, e) =>
+            {
+                _saveDebounce.Stop();
+                _settings.Save();
+            };
             ThemeManager.Apply(_settings.Theme);
             _wallii = new WalliiService(
                 new WalliiApi(_settings.WalliiBaseUrl, _settings.WalliiAnonKey),
@@ -118,7 +130,14 @@ namespace MMRadar.Engine
         {
             try
             {
-                SaveLayout();
+                // Flush synchronously — a pending debounced write would race
+                // HDT's shutdown and could lose the last zoom or drag.
+                _saveDebounce?.Stop();
+                if (_panel != null && _settings != null)
+                {
+                    CaptureLayout();
+                    _settings.Save();
+                }
                 ThemeManager.Reset();
                 try { _settingsWindow?.Close(); } catch { }
                 _settingsWindow = null;
@@ -593,20 +612,26 @@ namespace MMRadar.Engine
         {
             try
             {
-                var left = Canvas.GetLeft(_panel);
-                var top = Canvas.GetTop(_panel);
-                if (!double.IsNaN(left)) _settings.PanelLeft = left;
-                if (!double.IsNaN(top)) _settings.PanelTop = top;
-                // Persist the scale only once the user explicitly chose one; an
-                // auto-derived value must never be latched into the settings.
-                if (_scaleTouched)
-                    _settings.Scale = _panel.PanelScale;
-                _settings.Save();
+                CaptureLayout();
+                _saveDebounce.Stop();
+                _saveDebounce.Start();
             }
             catch (Exception ex)
             {
                 Logger.Error("SaveLayout failed", ex);
             }
+        }
+
+        private void CaptureLayout()
+        {
+            var left = Canvas.GetLeft(_panel);
+            var top = Canvas.GetTop(_panel);
+            if (!double.IsNaN(left)) _settings.PanelLeft = left;
+            if (!double.IsNaN(top)) _settings.PanelTop = top;
+            // Persist the scale only once the user explicitly chose one; an
+            // auto-derived value must never be latched into the settings.
+            if (_scaleTouched)
+                _settings.Scale = _panel.PanelScale;
         }
 
         private static double SafeCoord(double value, double fallback) =>
