@@ -433,14 +433,18 @@ namespace MMRadar.Game
                     if (player == null)
                         continue;
 
-                    // Accept the duos team id from any entity carrying it, EXCEPT
-                    // player-type entities for non-local players: their PLAYER_ID
-                    // tag lives in the log id space (e.g. 15 for the tavern), which
-                    // can collide with another player's hero-space id (1..8).
-                    // The local player's own PLAYER entity is the one place their
-                    // team id is guaranteed to appear — their hero may never get it.
+                    // Accept the duos team id from any entity carrying it. For
+                    // PLAYER-type entities the PLAYER_ID tag lives in the log id
+                    // space (e.g. 15 for the tavern), which can collide with another
+                    // player's hero-space id (1..8) — so a player entity donates its
+                    // team only when the log confirms it belongs to this very player
+                    // by name. That covers the one case that NEEDS it: the game's
+                    // POV player (you, or the spectated friend), whose own hero may
+                    // never carry the team tag.
                     if (entity.HasTag(GameTag.BACON_DUO_TEAM_ID) &&
-                        (!entity.IsPlayer || player.IsLocalPlayer))
+                        (!entity.IsPlayer ||
+                         (_namesByPlayerId.TryGetValue(playerId, out var entityName) &&
+                          string.Equals(entityName, player.Name, StringComparison.OrdinalIgnoreCase))))
                         player.TeamId = entity.GetTag(GameTag.BACON_DUO_TEAM_ID);
 
                     if (entity.IsHero && entity.HasTag(GameTag.PLAYER_LEADERBOARD_PLACE))
