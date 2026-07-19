@@ -39,12 +39,17 @@ namespace MMRadar.UI
                     return;
                 _isDead = value;
                 OnPropertyChanged(nameof(IsDead));
-                OnPropertyChanged(nameof(RowOpacity));
+                OnPropertyChanged(nameof(TextOpacity));
                 OnPropertyChanged(nameof(DeadVisibility));
             }
         }
 
-        public double RowOpacity => IsDead ? 0.45 : 1.0;
+        /// <summary>
+        /// Dead rows dim only the name and rating — never the avg chip: a
+        /// whole-row dim turned the colored chip into a mystery grey blob.
+        /// The skull marks the elimination explicitly.
+        /// </summary>
+        public double TextOpacity => IsDead ? 0.55 : 1.0;
         public Visibility DeadVisibility => IsDead ? Visibility.Visible : Visibility.Collapsed;
 
         public event PropertyChangedEventHandler PropertyChanged;

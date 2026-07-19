@@ -50,6 +50,12 @@ namespace MMRadar.Engine
         private int _previewGeneration;
         private SettingsWindow _settingsWindow;
         private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
+        private bool _spectateNoticeShown;
+
+        /// <summary>Set by HDT's choices watcher: a card-choice UI is on screen.</summary>
+        private volatile bool _choiceCardsVisible;
+        private bool _dodgeApplied;
+        private bool _choicesHooked;
 
         /// <summary>True once the user has chosen an explicit scale (mouse wheel).</summary>
         private bool _scaleTouched;
@@ -110,6 +116,18 @@ namespace MMRadar.Engine
             HdtCore.OverlayCanvas.Children.Add(_popup);
             HdtCore.OverlayCanvas.Children.Add(_settingsCard);
 
+            // The same signal HDT uses to dodge its own overlay during discover
+            // picks: fires within ~16 ms of the choice UI opening or closing.
+            try
+            {
+                Hearthstone_Deck_Tracker.Hearthstone.Watchers.ChoicesWatcher.Change += OnChoicesChanged;
+                _choicesHooked = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("ChoicesWatcher unavailable, falling back to polling: " + ex.Message);
+            }
+
             Logger.Info("Plugin loaded");
         }
 
@@ -117,6 +135,12 @@ namespace MMRadar.Engine
         {
             try
             {
+                if (_choicesHooked)
+                {
+                    try { Hearthstone_Deck_Tracker.Hearthstone.Watchers.ChoicesWatcher.Change -= OnChoicesChanged; }
+                    catch { /* watcher may already be gone */ }
+                    _choicesHooked = false;
+                }
                 SaveLayout();
                 ThemeManager.Reset();
                 try { _settingsWindow?.Close(); } catch { }
@@ -175,6 +199,14 @@ namespace MMRadar.Engine
                         var generation = ++_fetchGeneration;
                         _ = FetchLobbyStatsAsync(lobby, generation);
                     }
+                    else if (!_spectateNoticeShown && _tracker.IsSpectating)
+                    {
+                        // Spectated games never print the other players' names, so
+                        // an honest notice beats an eternal spinner (the normal flow
+                        // still takes over if a real roster ever resolves).
+                        _spectateNoticeShown = true;
+                        _panel.SetStatus("Spectating — lobby data unavailable");
+                    }
                 }
                 else if (_phase == Phase.Loaded || _phase == Phase.Fetching)
                 {
@@ -219,10 +251,73 @@ namespace MMRadar.Engine
                         }
                     }
                 }
+
+                // Belt-and-braces: re-evaluate the choice dodge each tick — catches
+                // the combat→shop transition with a still-open pick, and serves as
+                // the polling path when the watcher subscription failed.
+                if (!_choicesHooked)
+                {
+                    var offered = HdtCore.Game.Player?.OfferedEntityIds;
+                    _choiceCardsVisible = offered != null && offered.Count >= 2;
+                }
+                UpdateChoiceDodge();
             }
             catch (Exception ex)
             {
                 Logger.Error("Tick failed", ex);
+            }
+        }
+
+        private void OnChoicesChanged(object sender, HearthWatcher.EventArgs.ChoicesWatcher args)
+        {
+            try
+            {
+                var choice = args?.CurrentChoice;
+                _choiceCardsVisible = choice != null && choice.IsVisible &&
+                                      choice.Cards != null && choice.Cards.Any();
+                RunOnUi(UpdateChoiceDodge);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("OnChoicesChanged: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// While a card-choice UI (dig, trinket, triple reward, discover) is on
+        /// screen, the overlay cards fade to 15% and RELEASE their clicks so the
+        /// game cards underneath stay pickable. Combat is skipped (pending picks
+        /// sit collapsed there) and so is the hero pick, where the panel is at
+        /// its most useful.
+        /// </summary>
+        private void UpdateChoiceDodge()
+        {
+            bool dodge;
+            try
+            {
+                dodge = _choiceCardsVisible &&
+                        _phase != Phase.Idle && !_hiddenForThisGame &&
+                        HdtCore.Game != null &&
+                        HdtCore.Game.IsBattlegroundsMatch &&
+                        !HdtCore.Game.IsBattlegroundsCombatPhase &&
+                        HdtCore.Game.IsBattlegroundsHeroPickingDone;
+            }
+            catch
+            {
+                dodge = false;
+            }
+            if (dodge == _dodgeApplied)
+                return;
+            _dodgeApplied = dodge;
+            foreach (var element in new System.Windows.FrameworkElement[] { _panel, _popup, _settingsCard })
+            {
+                // The attached property is the real click lever: it adds/removes the
+                // element from HDT's clickable-region list; IsHitTestVisible alone
+                // would not make the overlay window click-through again.
+                OverlayExtensions.SetIsOverlayHitTestVisible(element, !dodge);
+                element.BeginAnimation(System.Windows.UIElement.OpacityProperty,
+                    new System.Windows.Media.Animation.DoubleAnimation(
+                        dodge ? 0.15 : 1.0, TimeSpan.FromMilliseconds(150)));
             }
         }
 
@@ -498,6 +593,9 @@ namespace MMRadar.Engine
             _popupGeneration++;
             _lastFetchFailed = false;
             _fetchRetries = 0;
+            _spectateNoticeShown = false;
+            _choiceCardsVisible = false;
+            UpdateChoiceDodge(); // restore opacity + clickability for the next game
             // Whatever lobby info HDT still holds now belongs to the finished game.
             _tracker.MarkCurrentLobbyInfoStale();
             _tracker.Reset();

@@ -109,8 +109,7 @@
                                     Tag="{Binding}"
                                     Cursor="Hand"
                                     ToolTip="{Binding TooltipText}"
-                                    Background="{Binding RowBackground}"
-                                    Opacity="{Binding RowOpacity}">
+                                    Background="{Binding RowBackground}">
                                 <!-- HUD typography; shared-size columns keep every row
                                      aligned while the panel hugs its content. -->
                                 <Grid Margin="10,0,8,0" Height="{DynamicResource RowHeight}">
@@ -127,6 +126,7 @@
 
                                     <!-- name + markers -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                                Opacity="{Binding TextOpacity}"
                                                 Margin="0,0,12,0">
                                         <TextBlock Text="{Binding Name}"
                                                    FontSize="{DynamicResource RowFontSize}" FontWeight="SemiBold"
@@ -153,6 +153,7 @@
                                                TextOptions.TextFormattingMode="Ideal"
                                                FontSize="{DynamicResource RowFontSize}" FontWeight="SemiBold"
                                                Foreground="{Binding RatingBrush}"
+                                               Opacity="{Binding TextOpacity}"
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Right"
                                                Margin="0,0,8,0"/>

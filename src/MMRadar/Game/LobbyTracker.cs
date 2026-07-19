@@ -23,10 +23,22 @@ namespace MMRadar.Game
             @"PlayerID=(?<id>\d+), PlayerName=(?<name>.+?)\s*$",
             RegexOptions.Compiled);
 
+        /// <summary>
+        /// "Player EntityID=2 PlayerID=1 GameAccountId=[hi=1441... lo=1071...]" —
+        /// printed for every game player entity. hi=0 lo=0 means a FAKE entity
+        /// (the tavern / an AI), which nevertheless gets its own DebugPrintGame
+        /// name line looking exactly like a human player.
+        /// </summary>
+        private static readonly Regex AccountLineRegex = new Regex(
+            @"Player EntityID=\d+ PlayerID=(?<id>\d+) GameAccountId=\[hi=(?<hi>\d+) lo=(?<lo>\d+)\]",
+            RegexOptions.Compiled);
+
         private const string UnknownPlayer = "UNKNOWN HUMAN PLAYER";
 
         private int _powerLogIndex;
         private readonly Dictionary<int, string> _namesByPlayerId = new Dictionary<int, string>();
+        private readonly HashSet<int> _fakePlayerIds = new HashSet<int>();
+        private bool _sawSpectateMarker;
 
         /// <summary>
         /// GameUuid of the last lobby we resolved via BattlegroundsLobbyInfo. HDT's watcher
@@ -48,6 +60,30 @@ namespace MMRadar.Game
         {
             _powerLogIndex = 0;
             _namesByPlayerId.Clear();
+            _fakePlayerIds.Clear();
+            _sawSpectateMarker = false;
+        }
+
+        /// <summary>
+        /// True while the current game is being spectated. HDT's flag is the
+        /// primary source; the Power.log spectate markers (which HDT forwards
+        /// into Game.PowerLog) are the belt-and-braces fallback.
+        /// </summary>
+        public bool IsSpectating
+        {
+            get
+            {
+                try
+                {
+                    if (HdtCore.Game.Spectator)
+                        return true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug("IsSpectating: " + ex.Message);
+                }
+                return _sawSpectateMarker;
+            }
         }
 
         /// <summary>
@@ -92,6 +128,12 @@ namespace MMRadar.Game
                     return null;
 
                 AttachHeroEntities(players, gameUuid);
+
+                // While spectating, HdtCore.Game.Player is the SPECTATED player,
+                // not the user — a gold "you" row would be a lie.
+                if (IsSpectating)
+                    foreach (var p in players)
+                        p.IsLocalPlayer = false;
 
                 return new LobbyState
                 {
@@ -218,7 +260,8 @@ namespace MMRadar.Game
             // In duos the log only ever prints the local player plus the tavern
             // entity (which carries a bot-like name) — a "lobby" built from that
             // would be a fake 2-player list, so duos trusts lobby info only.
-            if (HdtCore.Game.IsBattlegroundsDuosMatch && _namesByPlayerId.Count < 8)
+            // Spectated games print only the spectated player, so the same applies.
+            if ((HdtCore.Game.IsBattlegroundsDuosMatch || IsSpectating) && _namesByPlayerId.Count < 8)
                 return null;
 
             // All 8 lobby names are printed at game creation; accept a partial lobby
@@ -251,9 +294,39 @@ namespace MMRadar.Game
             for (var i = _powerLogIndex; i < log.Count; i++)
             {
                 var line = log[i];
+                if (line == null)
+                    continue;
+
+                // HDT forwards the spectate bracket lines into Game.PowerLog.
+                if (line.Contains("Begin Spectating") || line.Contains("Start Spectator"))
+                {
+                    _sawSpectateMarker = true;
+                    continue;
+                }
+                if (line.Contains("End Spectator"))
+                {
+                    _sawSpectateMarker = false;
+                    continue;
+                }
+
+                // Account lines expose which player ids are FAKE entities (the
+                // tavern, AI): they have GameAccountId hi=0 lo=0 but still get a
+                // human-looking DebugPrintGame name line.
+                if (line.Contains("GameAccountId=["))
+                {
+                    var am = AccountLineRegex.Match(line);
+                    if (am.Success && am.Groups["hi"].Value == "0" && am.Groups["lo"].Value == "0")
+                    {
+                        var fakeId = int.Parse(am.Groups["id"].Value);
+                        _fakePlayerIds.Add(fakeId);
+                        _namesByPlayerId.Remove(fakeId); // in case its name was scanned first
+                    }
+                    continue;
+                }
+
                 // Anchor to the exact game-creation print to avoid matching any other
                 // log format that happens to contain "PlayerID=".
-                if (line == null || !line.Contains("DebugPrintGame()") || !line.Contains("PlayerID="))
+                if (!line.Contains("DebugPrintGame()") || !line.Contains("PlayerID="))
                     continue;
                 var m = PlayerLineRegex.Match(line);
                 if (!m.Success)
@@ -262,6 +335,8 @@ namespace MMRadar.Game
                 if (string.IsNullOrWhiteSpace(name) || name == UnknownPlayer)
                     continue;
                 var id = int.Parse(m.Groups["id"].Value);
+                if (_fakePlayerIds.Contains(id))
+                    continue;
                 _namesByPlayerId[id] = name;
             }
             _powerLogIndex = log.Count;
@@ -346,7 +421,12 @@ namespace MMRadar.Game
                         if (string.IsNullOrEmpty(player.HeroCardId))
                             player.HeroCardId = entity.CardId;
                         player.LeaderboardPlace = entity.GetTag(GameTag.PLAYER_LEADERBOARD_PLACE);
-                        player.IsDead = entity.Health <= 0;
+                        // One-way latch: on death the game spawns a hero COPY with
+                        // DAMAGE reset to 0 that reads alive and iterates after the
+                        // real graveyarded hero — without the latch a dead player's
+                        // row "resurrects". BG players never come back within a game.
+                        if (entity.HasTag(GameTag.HEALTH) && entity.Health <= 0)
+                            player.IsDead = true;
                     }
                 }
 
