@@ -1,0 +1,48 @@
+<UserControl x:Class="MMRadar.UI.SettingsCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:MMRadar.UI"
+             FontFamily="Segoe UI"
+             SnapsToDevicePixels="True"
+             UseLayoutRounding="True"
+             TextOptions.TextFormattingMode="Display">
+    <!-- In-overlay host for SettingsContent: lives on HDT's overlay canvas like
+         the dossier popup, so it never steals focus from the game, shares the
+         overlay's z-order, and disappears together with the overlay. -->
+    <Border x:Name="Root"
+            CornerRadius="12"
+            Background="#FF1A1B1E"
+            BorderBrush="#33FFFFFF"
+            BorderThickness="1"
+            Padding="16,10,16,12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.25" Color="#FF000000"/>
+        </Border.Effect>
+        <StackPanel>
+            <DockPanel Margin="2,0,0,8" LastChildFill="True">
+                <Button x:Name="CloseButton" DockPanel.Dock="Right"
+                        Content="✕" Click="Close_Click" ToolTip="Close"
+                        Width="18" Height="18" FontSize="10"
+                        Foreground="#FFAAB0B7" Background="Transparent"
+                        Cursor="Hand" Focusable="False">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="4">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bg" Property="Background" Value="#26FFFFFF"/>
+                                    <Setter Property="Foreground" Value="#FFF2F4F6"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+                <TextBlock Text="SETTINGS" FontSize="10" FontWeight="Bold"
+                           Foreground="#FFAAB0B7" VerticalAlignment="Center"/>
+            </DockPanel>
+            <ui:SettingsContent x:Name="Body"/>
+        </StackPanel>
+    </Border>
+</UserControl>

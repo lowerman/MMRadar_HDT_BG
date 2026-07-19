@@ -34,6 +34,7 @@ namespace MMRadar.Harness
             var mode = "0";
             var scale = 1.0;
             var asc = false;
+            var showCard = false;
             string settingsShot = null;
             for (var i = 0; i < args.Length; i++)
             {
@@ -51,6 +52,7 @@ namespace MMRadar.Harness
                         scale = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
                         break;
                     case "--asc": asc = true; break;
+                    case "--card": showCard = true; break;
                     case "--settingsshot": settingsShot = args[++i]; break;
                 }
             }
@@ -93,15 +95,30 @@ namespace MMRadar.Harness
             };
 
             var panel = new LobbyPanel { PanelScale = scale, SortAscending = asc };
-            panel.SettingsRequested += () =>
-                new SettingsWindow(() => { }, () => { }, "hdt", k => { }, asc, b => { }).Show();
             var popup = new PlayerDetailsPopup { PanelScale = scale };
+            var settingsCard = new SettingsCard(() => { }, () => { }, k => { }, b => { })
+            {
+                Visibility = Visibility.Collapsed,
+                CardScale = scale,
+            };
             Canvas.SetLeft(panel, 24);
             Canvas.SetTop(panel, 24);
             Canvas.SetLeft(popup, Math.Max(396, 396 * scale));
             Canvas.SetTop(popup, 24);
+            Canvas.SetLeft(settingsCard, Math.Max(396, 396 * scale));
+            Canvas.SetTop(settingsCard, 24);
             canvas.Children.Add(panel);
             canvas.Children.Add(popup);
+            canvas.Children.Add(settingsCard);
+            // The gear toggles the in-overlay card, exactly like in HDT.
+            panel.SettingsRequested += () =>
+            {
+                settingsCard.Sync("hdt", asc);
+                popup.Visibility = Visibility.Collapsed;
+                settingsCard.Visibility = settingsCard.Visibility == Visibility.Visible
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+            };
 
             WalliiService live = null;
             if (liveNames != null || top)
@@ -187,6 +204,13 @@ namespace MMRadar.Harness
                     {
                         panel.IsCollapsed = true;
                         popup.Visibility = Visibility.Collapsed;
+                    }
+
+                    if (showCard)
+                    {
+                        settingsCard.Sync("hdt", asc);
+                        popup.Visibility = Visibility.Collapsed;
+                        settingsCard.Visibility = Visibility.Visible;
                     }
 
                     if (shotPath != null)

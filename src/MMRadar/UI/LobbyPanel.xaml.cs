@@ -72,6 +72,9 @@ namespace MMRadar.UI
             Resources["TitleFontSize"] = R(11.0 * k);
             Resources["CtxFontSize"] = R(11.0 * k);
             Resources["StatusFontSize"] = R(11.5 * k);
+            Resources["HeaderBtnSize"] = R(18.0 * k);
+            Resources["HeaderBtnFont"] = R(10.0 * k);
+            Resources["HeaderGearFont"] = R(11.0 * k);
             Resources["ChipColWidth"] = new GridLength(R(52.0 * k));
             RootBorder.MinWidth = _collapsed ? 0 : R(192.0 * k);
         }

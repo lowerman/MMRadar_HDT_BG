@@ -1,6 +1,7 @@
 <Window x:Class="MMRadar.UI.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:MMRadar.UI"
         Title="MMRadar"
         SizeToContent="WidthAndHeight"
         ResizeMode="NoResize"
@@ -8,130 +9,5 @@
         Background="#FF1A1B1E"
         FontFamily="Segoe UI"
         ShowInTaskbar="False">
-    <Window.Resources>
-        <SolidColorBrush x:Key="TextPrimary" Color="#FFF2F4F6"/>
-        <SolidColorBrush x:Key="TextMuted" Color="#FFAAB0B7"/>
-        <SolidColorBrush x:Key="AccentGold" Color="#FFE6C377"/>
-        <Style x:Key="ActionButton" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="Background" Value="#1FFFFFFF"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="12,7"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="8"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bg" Property="Background" Value="#33FFFFFF"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="ThemeButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="6,7"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-        </Style>
-        <Style x:Key="SubtleButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Padding" Value="4,4"/>
-            <Setter Property="Margin" Value="0,0,0,2"/>
-        </Style>
-    </Window.Resources>
-
-    <StackPanel Margin="18,14,18,14" Width="260">
-        <TextBlock Text="THEME" FontSize="9.5" FontWeight="SemiBold"
-                   Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
-        <UniformGrid Columns="3" Margin="0,0,0,12">
-            <Button x:Name="ThemeDarkButton" Style="{StaticResource ThemeButton}" Click="ThemeDark_Click"
-                    ToolTip="Solid near-black — maximum contrast">
-                <StackPanel>
-                    <Border Width="34" Height="18" CornerRadius="4" Background="#FF17181B"
-                            BorderBrush="#4DFFFFFF" BorderThickness="1" HorizontalAlignment="Center">
-                        <Border Width="14" Height="6" CornerRadius="2" Background="#FF3DD08F"
-                                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                    </Border>
-                    <TextBlock Text="Dark" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Button>
-            <Button x:Name="ThemeHdtButton" Style="{StaticResource ThemeButton}" Click="ThemeHdt_Click"
-                    ToolTip="Neutral grey — matches HDT's own panels (default)">
-                <StackPanel>
-                    <Border Width="34" Height="18" CornerRadius="4" Background="#FF262626"
-                            BorderBrush="#4DFFFFFF" BorderThickness="1" HorizontalAlignment="Center">
-                        <Border Width="14" Height="6" CornerRadius="2" Background="#FFCFAF6E"
-                                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                    </Border>
-                    <TextBlock Text="HDT" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Button>
-            <Button x:Name="ThemeHsButton" Style="{StaticResource ThemeButton}" Click="ThemeHs_Click"
-                    ToolTip="Warm dark with gold — blends with Hearthstone">
-                <StackPanel>
-                    <Border Width="34" Height="18" CornerRadius="4" Background="#FF191612"
-                            BorderBrush="#66DCB97A" BorderThickness="1" HorizontalAlignment="Center">
-                        <Border Width="14" Height="6" CornerRadius="2" Background="#FFE3B65C"
-                                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                    </Border>
-                    <TextBlock Text="Warm" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Button>
-        </UniformGrid>
-
-        <TextBlock Text="SORT ORDER" FontSize="9.5" FontWeight="SemiBold"
-                   Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
-        <UniformGrid Columns="2" Margin="0,0,0,12">
-            <Button x:Name="SortDescButton" Style="{StaticResource ThemeButton}" Click="SortDesc_Click"
-                    ToolTip="Strongest players at the top (default)">
-                <StackPanel>
-                    <TextBlock Text="↓" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Highest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                </StackPanel>
-            </Button>
-            <Button x:Name="SortAscButton" Style="{StaticResource ThemeButton}" Click="SortAsc_Click"
-                    ToolTip="Weakest players at the top, like BGRank">
-                <StackPanel>
-                    <TextBlock Text="↑" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Lowest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                </StackPanel>
-            </Button>
-        </UniformGrid>
-
-        <TextBlock Text="OVERLAY" FontSize="9.5" FontWeight="SemiBold"
-                   Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
-
-        <Button Style="{StaticResource ActionButton}" Click="Reset_Click">
-            <StackPanel>
-                <TextBlock Text="Reset position and scale" FontWeight="SemiBold"/>
-                <TextBlock Text="brings the panel back to the top-left corner"
-                           FontSize="10" Foreground="{StaticResource TextMuted}"/>
-            </StackPanel>
-        </Button>
-
-        <!-- Positioning aid, not a primary action — kept deliberately quiet so it
-             does not read as something you are supposed to press. -->
-        <Button Style="{StaticResource SubtleButton}" Click="Preview_Click"
-                ToolTip="Fills the panel with the current world top-8 so you can position and scale it without starting a game">
-            <TextBlock FontSize="10.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"
-                       Text="Show / hide preview · demo lobby for positioning"/>
-        </Button>
-
-        <TextBlock Margin="2,4,0,0" FontSize="10" Foreground="{StaticResource TextMuted}"
-                   TextWrapping="Wrap"
-                   Text="Drag the panel by its header · mouse wheel over the header zooms. The overlay is only visible while Hearthstone is running."/>
-    </StackPanel>
+    <ui:SettingsContent x:Name="Body" Margin="18,14,18,14"/>
 </Window>

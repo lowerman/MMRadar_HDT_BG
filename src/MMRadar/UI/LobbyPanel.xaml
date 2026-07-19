@@ -24,6 +24,9 @@
             <sys:Double x:Key="TitleFontSize">11</sys:Double>
             <sys:Double x:Key="CtxFontSize">11</sys:Double>
             <sys:Double x:Key="StatusFontSize">11.5</sys:Double>
+            <sys:Double x:Key="HeaderBtnSize">18</sys:Double>
+            <sys:Double x:Key="HeaderBtnFont">10</sys:Double>
+            <sys:Double x:Key="HeaderGearFont">11</sys:Double>
             <GridLength x:Key="ChipColWidth">52</GridLength>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -63,11 +66,17 @@
                     </StackPanel>
                     <Button x:Name="CollapseButton" DockPanel.Dock="Right"
                             Style="{StaticResource IconButton}"
+                            Width="{DynamicResource HeaderBtnSize}" Height="{DynamicResource HeaderBtnSize}"
+                            FontSize="{DynamicResource HeaderBtnFont}"
                             Content="–" Click="CollapseButton_Click"
                             ToolTip="Collapse into a small pill"/>
+                    <!-- The 12px gap is the misclick guard: two 18px targets with a
+                         2px gap invite hitting the gear when aiming at the minus. -->
                     <Button x:Name="SettingsButton" DockPanel.Dock="Right"
                             Style="{StaticResource IconButton}"
-                            Content="⚙" FontSize="11" Margin="0,0,2,0"
+                            Width="{DynamicResource HeaderBtnSize}" Height="{DynamicResource HeaderBtnSize}"
+                            FontSize="{DynamicResource HeaderGearFont}"
+                            Content="⚙" Margin="0,0,12,0"
                             Click="SettingsButton_Click"
                             ToolTip="Settings — theme, sort order, preview"/>
                     <!-- lobby average + your delta live in the header to save a row -->

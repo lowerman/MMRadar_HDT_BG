@@ -35,6 +35,7 @@ namespace MMRadar.Engine
         private PluginSettings _settings;
         private LobbyPanel _panel;
         private PlayerDetailsPopup _popup;
+        private SettingsCard _settingsCard;
 
         private Phase _phase = Phase.Idle;
         private LobbyState _lobby;
@@ -68,6 +69,11 @@ namespace MMRadar.Engine
 
             _panel = new LobbyPanel { Visibility = System.Windows.Visibility.Collapsed };
             _popup = new PlayerDetailsPopup { Visibility = System.Windows.Visibility.Collapsed };
+            _settingsCard = new SettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending)
+            {
+                Visibility = System.Windows.Visibility.Collapsed,
+            };
+            _settingsCard.CloseRequested += HideSettingsCard;
 
             Canvas.SetLeft(_panel, SafeCoord(_settings.PanelLeft, 40));
             Canvas.SetTop(_panel, SafeCoord(_settings.PanelTop, 130));
@@ -79,14 +85,16 @@ namespace MMRadar.Engine
 
             OverlayExtensions.SetIsOverlayHitTestVisible(_panel, true);
             OverlayExtensions.SetIsOverlayHitTestVisible(_popup, true);
+            OverlayExtensions.SetIsOverlayHitTestVisible(_settingsCard, true);
 
             _panel.PlayerClicked += OnPlayerClicked;
             _panel.LayoutChanged += SaveLayout;
-            _panel.SettingsRequested += OpenSettings;
+            _panel.SettingsRequested += ToggleSettingsCard;
             _panel.ScaleChangedByUser += () =>
             {
                 _scaleTouched = true;
                 _popup.PanelScale = _panel.PanelScale;
+                _settingsCard.CardScale = _panel.PanelScale;
             };
             _panel.SortAscending = _settings.SortAscending;
             _panel.IsCollapsed = _settings.Collapsed;
@@ -100,6 +108,7 @@ namespace MMRadar.Engine
             // Attach to the overlay last so a failure above cannot orphan the controls.
             HdtCore.OverlayCanvas.Children.Add(_panel);
             HdtCore.OverlayCanvas.Children.Add(_popup);
+            HdtCore.OverlayCanvas.Children.Add(_settingsCard);
 
             Logger.Info("Plugin loaded");
         }
@@ -116,6 +125,7 @@ namespace MMRadar.Engine
                 {
                     HdtCore.OverlayCanvas.Children.Remove(_panel);
                     HdtCore.OverlayCanvas.Children.Remove(_popup);
+                    HdtCore.OverlayCanvas.Children.Remove(_settingsCard);
                 }
             }
             catch (Exception ex)
@@ -146,6 +156,7 @@ namespace MMRadar.Engine
                     _tracker.Reset();
                     _hiddenForThisGame = false;
                     _previewActive = false; // a real match replaces the sample preview
+                    HideSettingsCard();     // a stray card over hero-pick hurts most
                     _panel.ShowWaiting();
                     ShowPanel();
                 }
@@ -268,6 +279,7 @@ namespace MMRadar.Engine
             var generation = ++_popupGeneration;
             try
             {
+                HideSettingsCard(); // dossier and settings share the panel-side slot
                 PositionPopupNextToPanel();
                 _popup.ShowLoading(summary);
                 var details = await _wallii
@@ -372,6 +384,37 @@ namespace MMRadar.Engine
             });
         }
 
+        /// <summary>
+        /// Toggles the in-overlay settings card next to the panel (gear button).
+        /// Runs on the overlay, so the game never loses focus and a stray click
+        /// costs one more click on the same gear. Mutually exclusive with the
+        /// dossier popup — they share the space beside the panel.
+        /// </summary>
+        public void ToggleSettingsCard()
+        {
+            try
+            {
+                if (_settingsCard.Visibility == System.Windows.Visibility.Visible)
+                {
+                    HideSettingsCard();
+                    return;
+                }
+                _popupGeneration++; // cancel an in-flight dossier fetch re-showing the popup
+                _popup.Visibility = System.Windows.Visibility.Collapsed;
+                _settingsCard.Sync(_settings.Theme, _settings.SortAscending);
+                _settingsCard.CardScale = _panel.PanelScale;
+                PositionCardNextToPanel(_settingsCard, 292);
+                _settingsCard.Visibility = System.Windows.Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ToggleSettingsCard failed", ex);
+            }
+        }
+
+        private void HideSettingsCard() =>
+            _settingsCard.Visibility = System.Windows.Visibility.Collapsed;
+
         /// <summary>Opens (or focuses) the small settings dialog.</summary>
         public void OpenSettings()
         {
@@ -439,9 +482,12 @@ namespace MMRadar.Engine
             _scaleTouched = false;
             _panel.PanelScale = 1.0;
             _popup.PanelScale = 1.0;
+            _settingsCard.CardScale = 1.0;
             _settings.Save();
             _hiddenForThisGame = false;
             ShowPanel(); // re-applies the auto scale when the overlay has a real size
+            if (_settingsCard.Visibility == System.Windows.Visibility.Visible)
+                PositionCardNextToPanel(_settingsCard, 292); // follow the panel home
         }
 
         private void ResetToIdle()
@@ -500,9 +546,17 @@ namespace MMRadar.Engine
             _popupGeneration++; // cancel any in-flight details fetch re-showing the popup
             _panel.Visibility = System.Windows.Visibility.Collapsed;
             _popup.Visibility = System.Windows.Visibility.Collapsed;
+            HideSettingsCard();
         }
 
         private void PositionPopupNextToPanel()
+        {
+            _popup.PanelScale = _panel.PanelScale;
+            PositionCardNextToPanel(_popup, 280);
+        }
+
+        /// <summary>Places a card right of the panel, flipping left at the screen edge.</summary>
+        private void PositionCardNextToPanel(System.Windows.FrameworkElement card, double baseWidth)
         {
             var left = Canvas.GetLeft(_panel);
             var top = Canvas.GetTop(_panel);
@@ -510,19 +564,18 @@ namespace MMRadar.Engine
             if (double.IsNaN(top)) top = 130;
 
             var scale = _panel.PanelScale;
-            // Both cards scale via layout, so ActualWidth is already final.
+            // All cards scale via layout, so ActualWidth is already final.
             var measured = _panel.ActualWidth;
             var panelWidth = measured > 50 ? measured : 272 * scale;
-            var popupWidth = _popup.ActualWidth > 50 ? _popup.ActualWidth : 280 * scale;
+            var cardWidth = card.ActualWidth > 50 ? card.ActualWidth : baseWidth * scale;
             var x = left + panelWidth + 8;
 
             var canvasWidth = HdtCore.OverlayCanvas.ActualWidth;
-            if (canvasWidth > 100 && x + popupWidth > canvasWidth)
-                x = Math.Max(0, left - popupWidth - 8);
+            if (canvasWidth > 100 && x + cardWidth > canvasWidth)
+                x = Math.Max(0, left - cardWidth - 8);
 
-            _popup.PanelScale = scale;
-            Canvas.SetLeft(_popup, x);
-            Canvas.SetTop(_popup, top);
+            Canvas.SetLeft(card, x);
+            Canvas.SetTop(card, top);
         }
 
         private void SaveLayout()
