@@ -114,7 +114,12 @@
                                      aligned while the panel hugs its content. -->
                                 <Grid Margin="10,0,8,0" Height="{DynamicResource RowHeight}">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerName"/>
+                                        <!-- Star column: when the HEADER is the widest
+                                             element (long avg text), rows stretch to the
+                                             card width and the slack dissolves between
+                                             name and rating instead of leaving a dead
+                                             strip right of the chips. -->
+                                        <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerRating"/>
                                         <ColumnDefinition Width="{DynamicResource ChipColWidth}"/>
                                     </Grid.ColumnDefinitions>
