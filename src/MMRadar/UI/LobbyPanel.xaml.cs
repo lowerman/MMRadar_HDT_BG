@@ -187,14 +187,13 @@ namespace MMRadar.UI
         }
 
         /// <summary>
-        /// Rating order honoring the direction setting. Players with no data at all
-        /// (EffectiveRating 0) stay at the BOTTOM in both directions — a "no data"
-        /// row on top would be noise, not information.
+        /// Rating order honoring the direction setting. Ascending is the strict
+        /// mirror of descending: unknowns, then "&lt;8 000", then ratings up —
+        /// the strongest player ends up at the very bottom.
         /// </summary>
         private IOrderedEnumerable<PlayerSummary> OrderByRating(IEnumerable<PlayerSummary> src) =>
             _sortAscending
-                ? src.OrderBy(s => EffectiveRating(s) == 0 ? 1 : 0)
-                    .ThenBy(EffectiveRating)
+                ? src.OrderBy(EffectiveRating)
                     .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
                 : src.OrderByDescending(EffectiveRating)
                     .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase);
@@ -215,8 +214,7 @@ namespace MMRadar.UI
                 // alternate per team.
                 var grouped = summaries.GroupBy(s => s.TeamId);
                 var teams = (_sortAscending
-                        ? grouped.OrderBy(g => g.Max(EffectiveRating) == 0 ? 1 : 0)
-                            .ThenBy(g => g.Max(EffectiveRating))
+                        ? grouped.OrderBy(g => g.Max(EffectiveRating))
                         : grouped.OrderByDescending(g => g.Max(EffectiveRating)))
                     .ToList();
                 var zebra = ThemeManager.Freeze(ThemeManager.Current.SubtleFill);
