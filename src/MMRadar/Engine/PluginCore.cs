@@ -82,6 +82,7 @@ namespace MMRadar.Engine
 
             _panel.PlayerClicked += OnPlayerClicked;
             _panel.LayoutChanged += SaveLayout;
+            _panel.SettingsRequested += OpenSettings;
             _panel.ScaleChangedByUser += () =>
             {
                 _scaleTouched = true;

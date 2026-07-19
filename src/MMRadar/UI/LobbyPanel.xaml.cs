@@ -19,6 +19,9 @@ namespace MMRadar.UI
         public event Action<PlayerSummary> PlayerClicked;
         public event Action LayoutChanged;
 
+        /// <summary>Raised by the ⚙ header button; the host opens the settings dialog.</summary>
+        public event Action SettingsRequested;
+
         /// <summary>Raised when the user changes the scale via the mouse wheel.</summary>
         public event Action ScaleChangedByUser;
 
@@ -118,6 +121,7 @@ namespace MMRadar.UI
             Body.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             TitleRankPart.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             CollapseButton.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
+            SettingsButton.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
             HeaderContextText.Visibility = !_collapsed && _hasLobbyContext
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -331,6 +335,9 @@ namespace MMRadar.UI
             IsCollapsed = !_collapsed;
             CollapsedChanged?.Invoke(_collapsed);
         }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e) =>
+            SettingsRequested?.Invoke();
 
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {

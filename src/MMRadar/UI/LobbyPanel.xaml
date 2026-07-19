@@ -65,6 +65,11 @@
                             Style="{StaticResource IconButton}"
                             Content="–" Click="CollapseButton_Click"
                             ToolTip="Collapse into a small pill"/>
+                    <Button x:Name="SettingsButton" DockPanel.Dock="Right"
+                            Style="{StaticResource IconButton}"
+                            Content="⚙" FontSize="11" Margin="0,0,2,0"
+                            Click="SettingsButton_Click"
+                            ToolTip="Settings — theme, sort order, preview"/>
                     <!-- lobby average + your delta live in the header to save a row -->
                     <TextBlock x:Name="HeaderContextText" DockPanel.Dock="Right"
                                FontSize="{DynamicResource CtxFontSize}"

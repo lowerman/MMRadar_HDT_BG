@@ -67,6 +67,8 @@ namespace MMRadar.Harness
             };
 
             var panel = new LobbyPanel { PanelScale = scale, SortAscending = asc };
+            panel.SettingsRequested += () =>
+                new SettingsWindow(() => { }, () => { }, "hdt", k => { }, asc, b => { }).Show();
             var popup = new PlayerDetailsPopup { PanelScale = scale };
             Canvas.SetLeft(panel, 24);
             Canvas.SetTop(panel, 24);
