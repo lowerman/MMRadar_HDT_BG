@@ -68,8 +68,11 @@ namespace MMRadar.Wallii
                 }
             }
 
+            // A fresh instance per position: lobby namesakes (same base name, different
+            // battletags) each get their own summary object, so the in-game decoration
+            // (hero, team, "you") of one can never bleed into the other.
             var summaries = lobbyNames
-                .Select(n => result.TryGetValue(n, out var s) ? s : NotFound(n))
+                .Select(n => result.TryGetValue(n, out var s) ? Clone(s) : NotFound(n))
                 .ToList();
 
             // wallii only tracks the top of the ladder; fill in plain ratings for the

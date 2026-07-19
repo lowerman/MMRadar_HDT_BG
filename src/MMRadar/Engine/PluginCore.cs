@@ -278,11 +278,18 @@ namespace MMRadar.Engine
                     .ToList();
             }
 
-            // Decorate with in-game info.
-            foreach (var summary in summaries)
+            // Decorate with in-game info. The stats list preserves roster order, so
+            // pair positionally — a name lookup would glue lobby namesakes (same base
+            // name, different battletags) to whichever of them comes first.
+            for (var i = 0; i < summaries.Count; i++)
             {
-                var player = lobby.Players.FirstOrDefault(p =>
-                    string.Equals(p.Name, summary.LobbyName, StringComparison.OrdinalIgnoreCase));
+                var summary = summaries[i];
+                var player = i < lobby.Players.Count &&
+                             string.Equals(lobby.Players[i].Name, summary.LobbyName,
+                                 StringComparison.OrdinalIgnoreCase)
+                    ? lobby.Players[i]
+                    : lobby.Players.FirstOrDefault(p =>
+                        string.Equals(p.Name, summary.LobbyName, StringComparison.OrdinalIgnoreCase));
                 if (player != null)
                 {
                     summary.IsLocalPlayer = player.IsLocalPlayer;

@@ -179,20 +179,34 @@ namespace MMRadar.Game
             }
 
             var result = new List<LobbyPlayerInfo>();
+            var localAssigned = false;
             foreach (var p in lobbyPlayers)
             {
                 var name = StripTag(p.Name);
                 if (string.IsNullOrWhiteSpace(name) || name == UnknownPlayer)
                     return null; // wait until every slot has resolved
-                if (result.Any(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase)))
+                // Two DISTINCT players can share a base name (battletag suffixes
+                // differ) — dropping one would hide a real lobby member. Skip an
+                // entry only when it repeats a previous slot exactly (same name
+                // AND same picked hero): a stale double, not a second person.
+                var namesake = result.FirstOrDefault(r =>
+                    string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (namesake != null && !string.IsNullOrEmpty(p.HeroCardId) &&
+                    string.Equals(NormalizeHeroCardId(p.HeroCardId),
+                        NormalizeHeroCardId(namesake.HeroCardId), StringComparison.OrdinalIgnoreCase))
                     continue;
+                // Namesakes are indistinguishable by name alone — gold "you" goes
+                // to the first occurrence so the panel never shows two of them.
+                var isLocal = !localAssigned && localName != null &&
+                              string.Equals(name, localName, StringComparison.OrdinalIgnoreCase);
+                if (isLocal)
+                    localAssigned = true;
                 result.Add(new LobbyPlayerInfo
                 {
                     Name = name,
                     HeroCardId = p.HeroCardId,
-                    IsLocalPlayer = localName != null &&
-                                    string.Equals(name, localName, StringComparison.OrdinalIgnoreCase),
-                    PlayerId = FindPlayerId(name),
+                    IsLocalPlayer = isLocal,
+                    PlayerId = FindPlayerId(name, result),
                 });
             }
             if (result.Count == 0)
@@ -369,10 +383,17 @@ namespace MMRadar.Game
             _powerLogIndex = log.Count;
         }
 
-        private int FindPlayerId(string name)
+        /// <summary>
+        /// Log id for a name, skipping ids already taken by another roster player:
+        /// namesakes must not alias to one id, and an id another player adopted
+        /// from their hero entity must not be re-donated (returning 0 lets the
+        /// hero-card adoption pass resolve it instead).
+        /// </summary>
+        private int FindPlayerId(string name, List<LobbyPlayerInfo> assigned = null)
         {
             foreach (var kv in _namesByPlayerId)
-                if (string.Equals(kv.Value, name, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(kv.Value, name, StringComparison.OrdinalIgnoreCase) &&
+                    (assigned == null || assigned.All(p => p.PlayerId != kv.Key)))
                     return kv.Key;
             return 0;
         }
@@ -397,7 +418,7 @@ namespace MMRadar.Game
                 ScanPowerLog();
                 foreach (var p in players)
                     if (p.PlayerId == 0)
-                        p.PlayerId = FindPlayerId(p.Name);
+                        p.PlayerId = FindPlayerId(p.Name, players);
 
                 var entities = HdtCore.Game.Entities.Values.ToList();
 
@@ -506,15 +527,24 @@ namespace MMRadar.Game
                 var lobbyInfo = HdtCore.Game.MetaData?.BattlegroundsLobbyInfo;
                 if (lobbyInfo?.Players == null || lobbyInfo.GameUuid != gameUuid)
                     return;
+                // Base names can repeat (battletag suffixes differ), and the roster
+                // preserves lobby-info order — so the k-th entry of a name feeds the
+                // k-th roster player of that name. A FirstOrDefault lookup would pour
+                // both namesakes' hero ids into whichever player comes first.
+                var occurrence = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 foreach (var info in lobbyInfo.Players)
                 {
-                    if (string.IsNullOrEmpty(info.HeroCardId))
-                        continue;
                     var name = StripTag(info.Name);
                     if (name == null)
                         continue;
-                    var player = players.FirstOrDefault(p =>
-                        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+                    occurrence.TryGetValue(name, out var k);
+                    occurrence[name] = k + 1;
+                    if (string.IsNullOrEmpty(info.HeroCardId))
+                        continue;
+                    var player = players
+                        .Where(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                        .Skip(k)
+                        .FirstOrDefault();
                     if (player != null)
                         player.HeroCardId = info.HeroCardId;
                 }

@@ -306,12 +306,31 @@ namespace MMRadar.UI
         public void UpdateLiveState(IReadOnlyList<LobbyPlayerInfo> players)
         {
             var teamsChanged = false;
+            // Lobby namesakes (same base name, different battletags) are told apart
+            // by the game player id when known; until then the k-th row of a name
+            // pairs with the k-th player of that name. The id must still agree on
+            // the name — ids from Power.log and hero entities live in different
+            // spaces in duos, and a bare id match could cross them.
+            var occurrence = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in _rows)
             {
-                var match = players.FirstOrDefault(p =>
-                    string.Equals(p.Name, row.Summary?.LobbyName ?? row.Name, StringComparison.OrdinalIgnoreCase));
+                var name = row.Summary?.LobbyName ?? row.Name;
+                occurrence.TryGetValue(name, out var k);
+                occurrence[name] = k + 1;
+
+                var match = row.Summary != null && row.Summary.GamePlayerId > 0
+                    ? players.FirstOrDefault(p => p.PlayerId == row.Summary.GamePlayerId &&
+                        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                    : null;
+                if (match == null)
+                    match = players
+                        .Where(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                        .Skip(k)
+                        .FirstOrDefault();
                 if (match == null)
                     continue;
+                if (row.Summary != null && match.PlayerId > 0)
+                    row.Summary.GamePlayerId = match.PlayerId;
                 row.IsDead = match.IsDead;
                 if (row.Summary != null && match.TeamId > 0 && row.Summary.TeamId != match.TeamId)
                 {
