@@ -135,9 +135,13 @@
                                                    Visibility="{Binding DeadVisibility}"/>
                                     </StackPanel>
 
-                                    <!-- rating: same size and contrast as the name -->
+                                    <!-- rating: same size and contrast as the name.
+                                         Ideal formatting: Display-mode hinting gives
+                                         Segoe UI a narrower "1" at some sizes, which
+                                         breaks the digit columns across rows. -->
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding RatingText}"
+                                               TextOptions.TextFormattingMode="Ideal"
                                                FontSize="{DynamicResource RowFontSize}" FontWeight="SemiBold"
                                                Foreground="{Binding RatingBrush}"
                                                VerticalAlignment="Center"
