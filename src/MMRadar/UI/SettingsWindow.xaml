@@ -87,6 +87,25 @@
             </Button>
         </UniformGrid>
 
+        <TextBlock Text="SORT ORDER" FontSize="9.5" FontWeight="SemiBold"
+                   Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
+        <UniformGrid Columns="2" Margin="0,0,0,12">
+            <Button x:Name="SortDescButton" Style="{StaticResource ThemeButton}" Click="SortDesc_Click"
+                    ToolTip="Strongest players at the top (default)">
+                <StackPanel>
+                    <TextBlock Text="9k ▸ 8k" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Highest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Button>
+            <Button x:Name="SortAscButton" Style="{StaticResource ThemeButton}" Click="SortAsc_Click"
+                    ToolTip="Weakest players at the top, like BGRank">
+                <StackPanel>
+                    <TextBlock Text="8k ▸ 9k" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Lowest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Button>
+        </UniformGrid>
+
         <TextBlock Text="OVERLAY" FontSize="9.5" FontWeight="SemiBold"
                    Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
 

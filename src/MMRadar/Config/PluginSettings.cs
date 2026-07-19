@@ -17,6 +17,9 @@ namespace MMRadar.Config
         public string Theme { get; set; } = "hdt";
         public int RecentGamesCount { get; set; } = 10;
 
+        /// <summary>False = highest rating on top (default); true = lowest on top, like BGRank.</summary>
+        public bool SortAscending { get; set; }
+
         /// <summary>Optional overrides in case the wallii Supabase URL or anon key rotates.</summary>
         public string WalliiBaseUrl { get; set; }
         public string WalliiAnonKey { get; set; }

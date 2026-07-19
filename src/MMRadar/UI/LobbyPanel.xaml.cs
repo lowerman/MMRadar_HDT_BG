@@ -165,6 +165,40 @@ namespace MMRadar.UI
         private static int EffectiveRating(PlayerSummary s) =>
             s.OnLeaderboard ? s.Rating : s.FallbackRating ?? (s.BelowCutoff ? 1 : 0);
 
+        private bool _sortAscending;
+
+        /// <summary>False = highest rating on top (default); true = lowest on top.</summary>
+        public bool SortAscending
+        {
+            get => _sortAscending;
+            set
+            {
+                if (_sortAscending == value)
+                    return;
+                _sortAscending = value;
+                if (_lastSummaries != null)
+                {
+                    var status = _lastStatus;
+                    SetStats(_lastSummaries);
+                    if (status != null)
+                        SetStatus(status);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Rating order honoring the direction setting. Players with no data at all
+        /// (EffectiveRating 0) stay at the BOTTOM in both directions — a "no data"
+        /// row on top would be noise, not information.
+        /// </summary>
+        private IOrderedEnumerable<PlayerSummary> OrderByRating(IEnumerable<PlayerSummary> src) =>
+            _sortAscending
+                ? src.OrderBy(s => EffectiveRating(s) == 0 ? 1 : 0)
+                    .ThenBy(EffectiveRating)
+                    .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
+                : src.OrderByDescending(EffectiveRating)
+                    .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase);
+
         public void SetStats(IReadOnlyList<PlayerSummary> summaries)
         {
             _lastSummaries = summaries;
@@ -176,19 +210,20 @@ namespace MMRadar.UI
             // a clean list or perfect two-row bands, never a half-grouped mess.
             if (summaries.Count > 0 && summaries.All(s => s.TeamId > 0))
             {
-                // Teams ordered by their strongest member; both rows of a pair share
-                // one background, bands alternate per team.
-                var teams = summaries
-                    .GroupBy(s => s.TeamId)
-                    .OrderByDescending(g => g.Max(EffectiveRating))
+                // Teams ordered by their strongest member (direction follows the
+                // sort setting); both rows of a pair share one background, bands
+                // alternate per team.
+                var grouped = summaries.GroupBy(s => s.TeamId);
+                var teams = (_sortAscending
+                        ? grouped.OrderBy(g => g.Max(EffectiveRating) == 0 ? 1 : 0)
+                            .ThenBy(g => g.Max(EffectiveRating))
+                        : grouped.OrderByDescending(g => g.Max(EffectiveRating)))
                     .ToList();
                 var zebra = ThemeManager.Freeze(ThemeManager.Current.SubtleFill);
                 _rows = new List<LobbyRowVm>();
                 for (var i = 0; i < teams.Count; i++)
                 {
-                    foreach (var s in teams[i]
-                                 .OrderByDescending(EffectiveRating)
-                                 .ThenBy(x => x.LobbyName, StringComparer.OrdinalIgnoreCase))
+                    foreach (var s in OrderByRating(teams[i]))
                     {
                         var vm = LobbyRowVm.From(s);
                         if (i % 2 == 1)
@@ -199,10 +234,8 @@ namespace MMRadar.UI
             }
             else
             {
-                // Solo: real ratings first (desc), then below-cutoff, then unknowns.
-                _rows = summaries
-                    .OrderByDescending(EffectiveRating)
-                    .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
+                // Solo: real ratings in the chosen direction, unknowns always last.
+                _rows = OrderByRating(summaries)
                     .Select(LobbyRowVm.From)
                     .ToList();
             }

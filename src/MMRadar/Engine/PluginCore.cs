@@ -87,6 +87,7 @@ namespace MMRadar.Engine
                 _scaleTouched = true;
                 _popup.PanelScale = _panel.PanelScale;
             };
+            _panel.SortAscending = _settings.SortAscending;
             _panel.IsCollapsed = _settings.Collapsed;
             _panel.CollapsedChanged += collapsed =>
             {
@@ -380,7 +381,9 @@ namespace MMRadar.Engine
                     _settingsWindow.Activate();
                     return;
                 }
-                _settingsWindow = new SettingsWindow(ToggleOverlay, ResetPosition, _settings.Theme, SetTheme);
+                _settingsWindow = new SettingsWindow(
+                    ToggleOverlay, ResetPosition, _settings.Theme, SetTheme,
+                    _settings.SortAscending, SetSortAscending);
                 try { _settingsWindow.Owner = HdtCore.MainWindow; }
                 catch { /* owner is optional */ }
                 _settingsWindow.Show();
@@ -396,6 +399,13 @@ namespace MMRadar.Engine
             _settings.Theme = key;
             _settings.Save();
             ThemeManager.Apply(key);
+        }
+
+        public void SetSortAscending(bool ascending)
+        {
+            _settings.SortAscending = ascending;
+            _settings.Save();
+            _panel.SortAscending = ascending; // re-sorts the current lobby in place
         }
 
         public bool OverlayEnabled

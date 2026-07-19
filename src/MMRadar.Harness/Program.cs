@@ -33,6 +33,7 @@ namespace MMRadar.Harness
             var region = "EU";
             var mode = "0";
             var scale = 1.0;
+            var asc = false;
             for (var i = 0; i < args.Length; i++)
             {
                 switch (args[i])
@@ -48,6 +49,7 @@ namespace MMRadar.Harness
                     case "--scale":
                         scale = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
                         break;
+                    case "--asc": asc = true; break;
                 }
             }
 
@@ -64,7 +66,7 @@ namespace MMRadar.Harness
                 Content = canvas,
             };
 
-            var panel = new LobbyPanel { PanelScale = scale };
+            var panel = new LobbyPanel { PanelScale = scale, SortAscending = asc };
             var popup = new PlayerDetailsPopup { PanelScale = scale };
             Canvas.SetLeft(panel, 24);
             Canvas.SetTop(panel, 24);

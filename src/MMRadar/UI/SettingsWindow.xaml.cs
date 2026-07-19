@@ -14,18 +14,23 @@ namespace MMRadar.UI
         private readonly Action _togglePreview;
         private readonly Action _resetPosition;
         private readonly Action<string> _onThemeSelected;
+        private readonly Action<bool> _onSortChanged;
 
         public SettingsWindow(
             Action togglePreview,
             Action resetPosition,
             string currentTheme,
-            Action<string> onThemeSelected)
+            Action<string> onThemeSelected,
+            bool sortAscending,
+            Action<bool> onSortChanged)
         {
             InitializeComponent();
             _togglePreview = togglePreview;
             _resetPosition = resetPosition;
             _onThemeSelected = onThemeSelected;
+            _onSortChanged = onSortChanged;
             HighlightTheme(currentTheme);
+            HighlightSort(sortAscending);
         }
 
         private void Preview_Click(object sender, RoutedEventArgs e) => _togglePreview?.Invoke();
@@ -42,6 +47,23 @@ namespace MMRadar.UI
         {
             HighlightTheme(key);
             _onThemeSelected?.Invoke(key);
+        }
+
+        private void SortDesc_Click(object sender, RoutedEventArgs e) => SelectSort(false);
+
+        private void SortAsc_Click(object sender, RoutedEventArgs e) => SelectSort(true);
+
+        private void SelectSort(bool ascending)
+        {
+            HighlightSort(ascending);
+            _onSortChanged?.Invoke(ascending);
+        }
+
+        private void HighlightSort(bool ascending)
+        {
+            var gold = (Brush)Resources["AccentGold"];
+            Mark(SortDescButton, !ascending, gold);
+            Mark(SortAscButton, ascending, gold);
         }
 
         private void HighlightTheme(string key)
