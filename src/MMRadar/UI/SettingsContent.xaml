@@ -90,18 +90,34 @@
         <TextBlock Text="SORT ORDER" FontSize="9.5" FontWeight="SemiBold"
                    Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
         <UniformGrid Columns="2" Margin="0,0,0,12">
+            <!-- Same visual grammar as the theme buttons: a tiny preview of the
+                 result on top (bar length = rating size), the label below. -->
             <Button x:Name="SortDescButton" Style="{StaticResource ThemeButton}" Click="SortDesc_Click"
                     ToolTip="Strongest players at the top (default)">
                 <StackPanel>
-                    <TextBlock Text="↓" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Highest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <Border Width="34" Height="18" CornerRadius="4" Background="#FF17181B"
+                            BorderBrush="#4DFFFFFF" BorderThickness="1" HorizontalAlignment="Center">
+                        <StackPanel VerticalAlignment="Center" Margin="5,0">
+                            <Border Height="3" Width="22" CornerRadius="1.5" Background="#FFD9DDE2" HorizontalAlignment="Left"/>
+                            <Border Height="3" Width="14" CornerRadius="1.5" Background="#B3AAB0B7" HorizontalAlignment="Left" Margin="0,2,0,0"/>
+                            <Border Height="3" Width="8"  CornerRadius="1.5" Background="#66AAB0B7" HorizontalAlignment="Left" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="Highest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
             </Button>
             <Button x:Name="SortAscButton" Style="{StaticResource ThemeButton}" Click="SortAsc_Click"
                     ToolTip="Weakest players at the top, like BGRank">
                 <StackPanel>
-                    <TextBlock Text="↑" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Lowest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <Border Width="34" Height="18" CornerRadius="4" Background="#FF17181B"
+                            BorderBrush="#4DFFFFFF" BorderThickness="1" HorizontalAlignment="Center">
+                        <StackPanel VerticalAlignment="Center" Margin="5,0">
+                            <Border Height="3" Width="8"  CornerRadius="1.5" Background="#66AAB0B7" HorizontalAlignment="Left"/>
+                            <Border Height="3" Width="14" CornerRadius="1.5" Background="#B3AAB0B7" HorizontalAlignment="Left" Margin="0,2,0,0"/>
+                            <Border Height="3" Width="22" CornerRadius="1.5" Background="#FFD9DDE2" HorizontalAlignment="Left" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="Lowest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
             </Button>
         </UniformGrid>
@@ -125,8 +141,13 @@
                        Text="Show / hide preview · demo lobby for positioning"/>
         </Button>
 
-        <TextBlock Margin="2,4,0,0" FontSize="10" Foreground="{StaticResource TextMuted}"
+        <TextBlock Margin="2,6,0,2" FontSize="10.5" TextWrapping="Wrap"
+                   Foreground="{StaticResource TextPrimary}">
+            <Run Text="Zoom the overlay:" FontWeight="SemiBold"/>
+            <Run Text=" mouse wheel over the panel header."/>
+        </TextBlock>
+        <TextBlock Margin="2,0,0,0" FontSize="10" Foreground="{StaticResource TextMuted}"
                    TextWrapping="Wrap"
-                   Text="Drag the panel by its header · mouse wheel over the header zooms. The overlay is only visible while Hearthstone is running."/>
+                   Text="Drag the header to move the panel. The overlay is only visible while Hearthstone is running."/>
     </StackPanel>
 </UserControl>
