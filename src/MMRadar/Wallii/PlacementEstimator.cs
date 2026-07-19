@@ -14,6 +14,14 @@ namespace MMRadar.Wallii
         private static readonly double[] Placements =
             { 1, 2, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8 };
 
+        /// <summary>
+        /// A real game moves rating by at most a couple hundred points, and one
+        /// snapshot pair spans a game or two. A bigger jump is structural — a
+        /// season reset collapsing the rating in one step, or a data correction —
+        /// and must not be counted as a played game.
+        /// </summary>
+        private const int MaxPlausibleGameDelta = 500;
+
         public static double EstimatePlacement(double start, double end)
         {
             var gain = end - start;
@@ -49,7 +57,7 @@ namespace MMRadar.Wallii
                 var start = sorted[i];
                 var end = sorted[i + 1];
                 var delta = end.Rating - start.Rating;
-                if (delta == 0)
+                if (delta == 0 || Math.Abs(delta) > MaxPlausibleGameDelta)
                     continue;
                 records.Add(new GameRecord
                 {

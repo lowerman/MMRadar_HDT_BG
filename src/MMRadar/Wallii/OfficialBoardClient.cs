@@ -55,6 +55,13 @@ namespace MMRadar.Wallii
 
         private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(15);
 
+        /// <summary>
+        /// How long the on-disk board copy stays trustworthy. It exists to bridge
+        /// short mirror outages; without an age cap a copy taken before a season
+        /// reset would resurface last season's ratings as current data.
+        /// </summary>
+        private static readonly TimeSpan OfflineCopyMaxAge = TimeSpan.FromHours(48);
+
         private readonly HttpClient _http;
         private readonly string _baseUrl;
         private readonly string _cacheDir;
@@ -173,7 +180,11 @@ namespace MMRadar.Wallii
             try
             {
                 var path = OfflinePath(key);
-                return path != null && File.Exists(path) ? File.ReadAllText(path) : null;
+                if (path == null || !File.Exists(path))
+                    return null;
+                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > OfflineCopyMaxAge)
+                    return null;
+                return File.ReadAllText(path);
             }
             catch
             {
