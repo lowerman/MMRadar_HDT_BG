@@ -22,7 +22,7 @@ namespace MMRadar
 
         public string Author => "lowerman";
 
-        public Version Version => new Version(1, 0, 5);
+        public Version Version => new Version(1, 0, 6);
 
         public MenuItem MenuItem => _menuItem;
 

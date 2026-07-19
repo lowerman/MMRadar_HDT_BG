@@ -6,11 +6,12 @@ A [Hearthstone Deck Tracker](https://hsreplay.net/downloads/) plugin for **Battl
 
 ## Features
 
-- 🏆 **Lobby overview** — every player's rating and a color-coded **7-day average placement**, sorted by rating. The header shows the **lobby average and your delta** to it; streamers get a live dot, dead players grey out as the game goes on.
+- 🏆 **Lobby overview** — every player's rating and a color-coded **7-day average placement**, sorted by rating in either direction (highest or lowest on top, BGRank-style — your pick). The header shows the **lobby average and your delta** to it; streamers get a live dot, dead players grey out as the game goes on.
 - 📈 **The whole ladder covered** — wallii-tracked top players get full stats; everyone else on the official leaderboard still shows their rating (and a computed rank in the tooltip); confirmed sub-cutoff players show **<8 000**.
 - 🔍 **Player dossier on click** — recent games (estimated placement, MMR delta, resulting MMR), averages over the last ~10 games / today / last 7 days (all computed from the same data, so they never contradict each other), and an MMR trajectory chart aligned with the game list.
-- 🔤 **HUD-grade readability** — big high-contrast type, an auto-width card that hugs its content, and resolution-aware scaling (1080p ×1.0, 1440p ×1.33, 4K ×2.0). Zooming re-renders the text, so it stays crisp at any size.
+- 🔤 **HUD-grade readability** — big high-contrast type with strictly tabular digits, an auto-width card that hugs its content, and resolution-aware scaling (1080p ×1.0, 1440p ×1.2, 4K ×1.6). Zooming re-renders the text, so it stays crisp at any size.
 - 🎨 **Three themes** — **HDT** (neutral grey matching the deck tracker — default), **Dark** (solid near-black, maximum contrast), **Warm** (blends with Hearthstone's look). Switch instantly in Settings.
+- ⚙️ **Settings that respect the game** — the gear in the panel header opens a settings card **right on the overlay**, next to the panel: the game never loses focus, nothing pops up mid-screen, and the card hides itself when a match starts or ends.
 - 🤝 **Duos support** — teammates are grouped into pairs (alternating background bands, teams sorted by their strongest member) once the game reveals the teams; ratings, dossiers and the lobby average work in duos too.
 - 🫥 **Stays out of your way** — collapse the panel into a tiny ~30%-opacity pill <img src="artifacts/screenshot-collapsed.png" alt="collapsed pill" height="22">; click the pill to expand, drag to move. Position, scale, and collapsed state persist.
 - 🧪 **Live preview** — show the overlay with the current world top-8 (real wallii data) to position and scale it without starting a game.
@@ -30,8 +31,8 @@ Requirements: Windows, Hearthstone Deck Tracker (the plugin resolves its assembl
 
 - The panel appears automatically at the start of a Battlegrounds match, as soon as the game reports the lobby roster.
 - **Click a player row** to open their recent-games popup. Click another row to switch, or ✕ to close it.
+- **⚙ in the panel header** toggles the settings card beside the panel: theme picker, sort direction, position/scale reset, and a live preview for positioning. The same settings open as a regular dialog from Options → Tracker → Plugins → MMRadar → Settings.
 - **Plugins → MMRadar** in the HDT menu is a plain on/off checkbox, like other plugins.
-- The **Settings** button (Options → Tracker → Plugins → MMRadar) opens a small dialog: theme picker, live top-8 preview toggle, and position/scale reset.
 - **–** collapses the panel into a small semi-transparent pill; clicking the pill expands it back, dragging moves it. The mouse wheel over the header zooms the whole overlay.
 
 ## How it works

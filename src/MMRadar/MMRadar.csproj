@@ -9,7 +9,7 @@
     <RootNamespace>MMRadar</RootNamespace>
     <PlatformTarget>x64</PlatformTarget>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <Version>1.0.5</Version>
+    <Version>1.0.6</Version>
     <Company>MMRadar</Company>
     <Product>MMRadar</Product>
     <Description>Hearthstone Deck Tracker Battlegrounds plugin: lobby ratings + wallii.gg player stats</Description>
