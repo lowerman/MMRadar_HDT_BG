@@ -201,11 +201,11 @@ namespace MMRadar.Engine
                     }
                     else if (!_spectateNoticeShown && _tracker.IsSpectating)
                     {
-                        // Spectated games never print the other players' names, so
-                        // an honest notice beats an eternal spinner (the normal flow
-                        // still takes over if a real roster ever resolves).
+                        // Spectated games never hand over the roster — but hovering
+                        // the leaderboard portraits reveals names one by one (the
+                        // hover reader picks them up and the panel fills in).
                         _spectateNoticeShown = true;
-                        _panel.SetStatus("Spectating — lobby data unavailable");
+                        _panel.SetStatus("Spectating — hover the leaderboard portraits to reveal players");
                     }
                 }
                 else if (_phase == Phase.Loaded || _phase == Phase.Fetching)

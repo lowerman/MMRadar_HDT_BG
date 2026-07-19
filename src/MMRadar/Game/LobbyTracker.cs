@@ -39,6 +39,8 @@ namespace MMRadar.Game
         private readonly Dictionary<int, string> _namesByPlayerId = new Dictionary<int, string>();
         private readonly HashSet<int> _fakePlayerIds = new HashSet<int>();
         private bool _sawSpectateMarker;
+        private SpectateNameReader _spectateReader;
+        private List<string> _hoverNames = new List<string>();
 
         /// <summary>
         /// GameUuid of the last lobby we resolved via BattlegroundsLobbyInfo. HDT's watcher
@@ -62,6 +64,8 @@ namespace MMRadar.Game
             _namesByPlayerId.Clear();
             _fakePlayerIds.Clear();
             _sawSpectateMarker = false;
+            _hoverNames.Clear();
+            _spectateReader?.Clean();
         }
 
         /// <summary>
@@ -122,7 +126,7 @@ namespace MMRadar.Game
                 if (players == null)
                 {
                     gameUuid = null;
-                    players = TryFromPowerLog(localName);
+                    players = TryFromHoverTiles() ?? TryFromPowerLog(localName);
                 }
                 if (players == null)
                     return null;
@@ -253,6 +257,29 @@ namespace MMRadar.Game
                 Logger.Debug("EntitiesConfirmCachedRoster: " + ex.Message);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Spectate-only roster source: names read from the leaderboard tiles as
+        /// the spectator hovers portraits (the BGrank technique). The list grows
+        /// hover by hover; the core's partial-roster loop keeps upgrading it.
+        /// </summary>
+        private List<LobbyPlayerInfo> TryFromHoverTiles()
+        {
+            if (!IsSpectating)
+                return null;
+            if (_spectateReader == null)
+                _spectateReader = new SpectateNameReader();
+            var names = _spectateReader.TryReadNames();
+            // Names persist in game memory once revealed, but keep our own copy
+            // so a transient failed read cannot shrink an already-shown roster.
+            if (names != null && names.Count > _hoverNames.Count)
+                _hoverNames = names.ToList();
+            if (_hoverNames.Count < 2)
+                return null;
+            return _hoverNames
+                .Select(n => new LobbyPlayerInfo { Name = n })
+                .ToList();
         }
 
         private List<LobbyPlayerInfo> TryFromPowerLog(string localName)
