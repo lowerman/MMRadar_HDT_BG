@@ -79,11 +79,14 @@
                             Content="⚙" Margin="0,0,12,0"
                             Click="SettingsButton_Click"
                             ToolTip="Settings — theme, sort order, preview"/>
-                    <!-- lobby average + your delta live in the header to save a row -->
+                    <!-- lobby average + your delta live in the header to save a row.
+                         The LEFT margin is the guaranteed gap to the title: when the
+                         header is the widest element of the card there is no slack
+                         space, and without it the text glues itself to the title dot. -->
                     <TextBlock x:Name="HeaderContextText" DockPanel.Dock="Right"
                                FontSize="{DynamicResource CtxFontSize}"
                                Foreground="{DynamicResource TextMuted}"
-                               VerticalAlignment="Center" Margin="0,0,8,0"
+                               VerticalAlignment="Center" Margin="12,0,8,0"
                                Visibility="Collapsed"/>
                 </DockPanel>
             </Border>

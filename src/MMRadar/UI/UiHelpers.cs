@@ -45,7 +45,7 @@ namespace MMRadar.UI
             avg == null ? "–" : avg.Value.ToString("0.00", CultureInfo.InvariantCulture);
 
         public static string FormatDelta(int delta) =>
-            (delta > 0 ? "+" : "") + delta.ToString(CultureInfo.InvariantCulture);
+            (delta > 0 ? "+" : delta < 0 ? "-" : "") + FormatRating(Math.Abs(delta));
 
         public static string FormatPlacement(double placement) =>
             placement % 1 == 0
