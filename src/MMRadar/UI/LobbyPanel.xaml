@@ -64,29 +64,30 @@
                         <Ellipse Width="4" Height="4" Margin="5,1,0,0"
                                  Fill="{DynamicResource Accent}" VerticalAlignment="Center"/>
                     </StackPanel>
+                    <!-- The gear lives NEXT TO THE TITLE, at the opposite end from
+                         the collapse button: aiming at "–" can never hit it, and the
+                         header stays short enough to fit the body width. -->
+                    <Button x:Name="SettingsButton" DockPanel.Dock="Left"
+                            Style="{StaticResource IconButton}"
+                            Width="{DynamicResource HeaderBtnSize}" Height="{DynamicResource HeaderBtnSize}"
+                            FontSize="{DynamicResource HeaderGearFont}"
+                            Content="⚙" Margin="6,0,0,0" VerticalAlignment="Center"
+                            Click="SettingsButton_Click"
+                            ToolTip="Settings — theme, sort order, preview"/>
                     <Button x:Name="CollapseButton" DockPanel.Dock="Right"
                             Style="{StaticResource IconButton}"
                             Width="{DynamicResource HeaderBtnSize}" Height="{DynamicResource HeaderBtnSize}"
                             FontSize="{DynamicResource HeaderBtnFont}"
                             Content="–" Click="CollapseButton_Click"
                             ToolTip="Collapse into a small pill"/>
-                    <!-- The 12px gap is the misclick guard: two 18px targets with a
-                         2px gap invite hitting the gear when aiming at the minus. -->
-                    <Button x:Name="SettingsButton" DockPanel.Dock="Right"
-                            Style="{StaticResource IconButton}"
-                            Width="{DynamicResource HeaderBtnSize}" Height="{DynamicResource HeaderBtnSize}"
-                            FontSize="{DynamicResource HeaderGearFont}"
-                            Content="⚙" Margin="0,0,12,0"
-                            Click="SettingsButton_Click"
-                            ToolTip="Settings — theme, sort order, preview"/>
                     <!-- lobby average + your delta live in the header to save a row.
-                         The LEFT margin is the guaranteed gap to the title: when the
+                         The LEFT margin is the guaranteed gap to the gear: when the
                          header is the widest element of the card there is no slack
-                         space, and without it the text glues itself to the title dot. -->
+                         space, and without it the text would glue to its neighbor. -->
                     <TextBlock x:Name="HeaderContextText" DockPanel.Dock="Right"
                                FontSize="{DynamicResource CtxFontSize}"
                                Foreground="{DynamicResource TextMuted}"
-                               VerticalAlignment="Center" Margin="12,0,8,0"
+                               VerticalAlignment="Center" Margin="8,0,8,0"
                                Visibility="Collapsed"/>
                 </DockPanel>
             </Border>
