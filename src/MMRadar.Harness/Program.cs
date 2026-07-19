@@ -34,6 +34,7 @@ namespace MMRadar.Harness
             var mode = "0";
             var scale = 1.0;
             var asc = false;
+            string settingsShot = null;
             for (var i = 0; i < args.Length; i++)
             {
                 switch (args[i])
@@ -50,10 +51,35 @@ namespace MMRadar.Harness
                         scale = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
                         break;
                     case "--asc": asc = true; break;
+                    case "--settingsshot": settingsShot = args[++i]; break;
                 }
             }
 
             var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
+
+            if (settingsShot != null)
+            {
+                var sw = new SettingsWindow(() => { }, () => { }, "hdt", k => { }, asc, b => { });
+                sw.Loaded += async (s, e) =>
+                {
+                    await Task.Delay(400);
+                    var root = (FrameworkElement)sw.Content;
+                    var bmp = new RenderTargetBitmap(
+                        (int)Math.Ceiling(sw.ActualWidth), (int)Math.Ceiling(sw.ActualHeight),
+                        96, 96, PixelFormats.Pbgra32);
+                    var bg = new DrawingVisual();
+                    using (var ctx = bg.RenderOpen())
+                        ctx.DrawRectangle(sw.Background, null, new Rect(0, 0, sw.ActualWidth, sw.ActualHeight));
+                    bmp.Render(bg);
+                    bmp.Render(root);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(bmp));
+                    using (var stream = File.Create(settingsShot))
+                        enc.Save(stream);
+                    app.Shutdown(0);
+                };
+                return app.Run(sw);
+            }
 
             var canvas = new Canvas();
             var window = new Window

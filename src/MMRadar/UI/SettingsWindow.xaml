@@ -46,6 +46,11 @@
             <Setter Property="Padding" Value="6,7"/>
             <Setter Property="Margin" Value="0,0,6,0"/>
         </Style>
+        <Style x:Key="SubtleButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="4,4"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
     </Window.Resources>
 
     <StackPanel Margin="18,14,18,14" Width="260">
@@ -93,15 +98,15 @@
             <Button x:Name="SortDescButton" Style="{StaticResource ThemeButton}" Click="SortDesc_Click"
                     ToolTip="Strongest players at the top (default)">
                 <StackPanel>
-                    <TextBlock Text="9k ▸ 8k" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Highest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                    <TextBlock Text="↓" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Highest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
             <Button x:Name="SortAscButton" Style="{StaticResource ThemeButton}" Click="SortAsc_Click"
                     ToolTip="Weakest players at the top, like BGRank">
                 <StackPanel>
-                    <TextBlock Text="8k ▸ 9k" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Lowest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                    <TextBlock Text="↑" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Lowest first" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
         </UniformGrid>
@@ -109,20 +114,20 @@
         <TextBlock Text="OVERLAY" FontSize="9.5" FontWeight="SemiBold"
                    Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
 
-        <Button Style="{StaticResource ActionButton}" Click="Preview_Click">
-            <StackPanel>
-                <TextBlock Text="Show / hide preview" FontWeight="SemiBold"/>
-                <TextBlock Text="live top-8 players from wallii.gg"
-                           FontSize="10" Foreground="{StaticResource TextMuted}"/>
-            </StackPanel>
-        </Button>
-
         <Button Style="{StaticResource ActionButton}" Click="Reset_Click">
             <StackPanel>
                 <TextBlock Text="Reset position and scale" FontWeight="SemiBold"/>
                 <TextBlock Text="brings the panel back to the top-left corner"
                            FontSize="10" Foreground="{StaticResource TextMuted}"/>
             </StackPanel>
+        </Button>
+
+        <!-- Positioning aid, not a primary action — kept deliberately quiet so it
+             does not read as something you are supposed to press. -->
+        <Button Style="{StaticResource SubtleButton}" Click="Preview_Click"
+                ToolTip="Fills the panel with the current world top-8 so you can position and scale it without starting a game">
+            <TextBlock FontSize="10.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"
+                       Text="Show / hide preview · demo lobby for positioning"/>
         </Button>
 
         <TextBlock Margin="2,4,0,0" FontSize="10" Foreground="{StaticResource TextMuted}"
