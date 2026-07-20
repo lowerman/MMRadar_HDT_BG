@@ -14,17 +14,27 @@ namespace MMRadar.Wallii
     public class OfficialBoard
     {
         private readonly int[] _ratingsAscending;
-
-        public IReadOnlyDictionary<string, int> Ratings { get; }
+        private readonly Dictionary<string, int> _exact;
+        private readonly Dictionary<string, int> _folded;
 
         public int Count => _ratingsAscending.Length;
 
-        public OfficialBoard(Dictionary<string, int> ratings)
+        public OfficialBoard(Dictionary<string, int> exact, Dictionary<string, int> folded)
         {
-            Ratings = ratings;
-            _ratingsAscending = ratings.Values.ToArray();
+            _exact = exact;
+            _folded = folded;
+            _ratingsAscending = exact.Values.ToArray();
             Array.Sort(_ratingsAscending);
         }
+
+        /// <summary>
+        /// Exact-case match first: distinct players can differ by letter case
+        /// alone ("Pacific" 10356 vs "pacific" 8007 coexist on the EU board),
+        /// and the in-game lobby name carries the canonical casing. The folded
+        /// lookup is only a fallback for sources that lost the original case.
+        /// </summary>
+        public bool TryGetRating(string name, out int rating) =>
+            _exact.TryGetValue(name, out rating) || _folded.TryGetValue(name, out rating);
 
         /// <summary>1-based rank for a rating; ties share the better rank.</summary>
         public int RankOf(int rating)
@@ -116,32 +126,38 @@ namespace MMRadar.Wallii
                 }
             }
 
-            var ratings = Parse(text);
-            if (ratings.Count == 0)
+            var board = Parse(text);
+            if (board == null || board.Count == 0)
                 return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
 
-            var board = new OfficialBoard(ratings);
             _cache[key] = new BoardEntry { Board = board, At = DateTime.UtcNow };
             return board;
         }
 
-        private static Dictionary<string, int> Parse(string text)
+        private static OfficialBoard Parse(string text)
         {
-            // Format (see BGrank_bot): lines of "playerName rating" separated by "\n<br />".
-            // Duplicate names keep the first (highest-rated) entry.
-            var ratings = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            // Format (see BGrank_bot): lines of "playerName rating" separated by
+            // "\n<br />", sorted by rating descending. Names are kept CASE-EXACT
+            // ("Pacific" and "pacific" are different players); each dictionary
+            // keeps the first (highest-rated) entry per key.
+            var exact = new Dictionary<string, int>(StringComparer.Ordinal);
+            var folded = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (var line in text.Split(new[] { "\n<br />" }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var idx = line.LastIndexOf(' ');
                 if (idx <= 0)
                     continue;
                 var name = line.Substring(0, idx).Trim();
-                if (name.Length == 0 || ratings.ContainsKey(name))
+                if (name.Length == 0)
                     continue;
-                if (int.TryParse(line.Substring(idx + 1).Trim(), out var rating))
-                    ratings[name] = rating;
+                if (!int.TryParse(line.Substring(idx + 1).Trim(), out var rating))
+                    continue;
+                if (!exact.ContainsKey(name))
+                    exact[name] = rating;
+                if (!folded.ContainsKey(name))
+                    folded[name] = rating;
             }
-            return ratings;
+            return new OfficialBoard(exact, folded);
         }
 
         private static string MapRegion(string region)

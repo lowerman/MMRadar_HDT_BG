@@ -70,13 +70,23 @@ namespace MMRadar.Wallii
 
             // A fresh instance per position: lobby namesakes (same base name, different
             // battletags) each get their own summary object, so the in-game decoration
-            // (hero, team, "you") of one can never bleed into the other.
+            // (hero, team, "you") of one can never bleed into the other. Each clone
+            // keeps its position's EXACT casing — "Pacific" and "pacific" are distinct
+            // players on the official board, and the board lookup is case-exact.
             var summaries = lobbyNames
-                .Select(n => result.TryGetValue(n, out var s) ? Clone(s) : NotFound(n))
+                .Select(n =>
+                {
+                    if (!result.TryGetValue(n, out var s))
+                        return NotFound(n);
+                    var clone = Clone(s);
+                    clone.LobbyName = n;
+                    return clone;
+                })
                 .ToList();
 
-            // wallii only tracks the top of the ladder; fill in plain ratings for the
-            // rest from the full official leaderboard mirror.
+            // The official leaderboard mirror serves two jobs: plain ratings for
+            // players wallii does not track, and the authoritative CURRENT rating
+            // for the ones it does (wallii can lag by days for lapsed players).
             await FillFallbackRatingsAsync(summaries, preferredRegion, gameMode).ConfigureAwait(false);
 
             return summaries;
@@ -85,9 +95,7 @@ namespace MMRadar.Wallii
         private async Task FillFallbackRatingsAsync(
             List<PlayerSummary> summaries, string region, string gameMode)
         {
-            if (_board == null || region == null)
-                return;
-            if (!summaries.Any(s => !s.OnLeaderboard && s.FallbackRating == null))
+            if (_board == null || region == null || summaries.Count == 0)
                 return;
             try
             {
@@ -96,9 +104,23 @@ namespace MMRadar.Wallii
                     return;
                 foreach (var s in summaries)
                 {
-                    if (s.OnLeaderboard || s.FallbackRating != null)
+                    if (s.OnLeaderboard)
+                    {
+                        // The official board outranks wallii for the CURRENT rating:
+                        // once a player slips out of wallii's tracked top, wallii
+                        // keeps carrying their last seen value forward for days.
+                        // Positive evidence only — a name absent from the board must
+                        // never downgrade a tracked player (name spaces can differ).
+                        if (board.TryGetRating(s.LobbyName, out var official))
+                        {
+                            s.Rating = official;
+                            s.Rank = board.RankOf(official);
+                        }
                         continue;
-                    if (board.Ratings.TryGetValue(s.LobbyName, out var rating))
+                    }
+                    if (s.FallbackRating != null)
+                        continue;
+                    if (board.TryGetRating(s.LobbyName, out var rating))
                     {
                         s.FallbackRating = rating;
                         s.FallbackRank = board.RankOf(rating);
