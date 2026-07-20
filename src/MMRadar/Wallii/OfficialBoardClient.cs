@@ -82,6 +82,18 @@ namespace MMRadar.Wallii
     {
         public const string DefaultBaseUrl = "https://bgrank.fly.dev";
 
+        /// <summary>
+        /// GitHub-hosted copy of the same boards, refreshed every ~30 min by an
+        /// Action (see github.com/lowerman/bg-board-mirror). fly.dev is throttled
+        /// or frozen on many Russian ISPs; raw.githubusercontent.com is not.
+        /// </summary>
+        public const string MirrorBaseUrl =
+            "https://raw.githubusercontent.com/lowerman/bg-board-mirror/mirror";
+
+        /// <summary>Mirror data younger than this counts as live evidence (the
+        /// identity gate may use it); older mirror data still fills ratings.</summary>
+        private static readonly TimeSpan MirrorFreshEnough = TimeSpan.FromHours(6);
+
         private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(15);
 
         /// <summary>
@@ -138,12 +150,22 @@ namespace MMRadar.Wallii
             catch (Exception ex)
             {
                 Logger.Debug($"Official board fetch failed for {key}: {ex.Message}");
-                live = false;
-                text = LoadOfflineCopy(key);
-                if (text == null)
+                var mirror = await TryFetchMirrorAsync(key).ConfigureAwait(false);
+                if (mirror != null)
                 {
-                    // Keep serving a stale in-memory board rather than nothing.
-                    return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
+                    text = mirror.Value.Text;
+                    live = mirror.Value.Fresh;
+                    SaveOfflineCopy(key, text);
+                }
+                else
+                {
+                    live = false;
+                    text = LoadOfflineCopy(key);
+                    if (text == null)
+                    {
+                        // Keep serving a stale in-memory board rather than nothing.
+                        return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
+                    }
                 }
             }
 
@@ -186,6 +208,49 @@ namespace MMRadar.Wallii
                     folded[name] = rating;
             }
             return new OfficialBoard(exact, folded, caseAmbiguous, fromLiveFetch);
+        }
+
+        /// <summary>
+        /// Fallback fetch from the GitHub mirror. Returns null when the mirror is
+        /// unreachable or serves something that is not a board. Freshness comes
+        /// from the mirror's own manifest (updated.txt: "KEY iso-utc" lines).
+        /// </summary>
+        private async Task<(string Text, bool Fresh)?> TryFetchMirrorAsync(string key)
+        {
+            try
+            {
+                var text = await _http.GetStringAsync($"{MirrorBaseUrl}/{key}.txt").ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(text) || !text.Contains("<br />"))
+                    return null;
+
+                var fresh = false;
+                try
+                {
+                    var manifest = await _http.GetStringAsync($"{MirrorBaseUrl}/updated.txt").ConfigureAwait(false);
+                    foreach (var line in manifest.Split('\n'))
+                    {
+                        var parts = line.Trim().Split(' ');
+                        if (parts.Length == 2 && parts[0] == key &&
+                            DateTimeOffset.TryParse(parts[1], null,
+                                System.Globalization.DateTimeStyles.AssumeUniversal, out var at))
+                        {
+                            fresh = DateTimeOffset.UtcNow - at <= MirrorFreshEnough;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug("Mirror manifest unavailable: " + ex.Message);
+                }
+                Logger.Info($"Official board for {key} served by the GitHub mirror (fresh: {fresh})");
+                return (text, fresh);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"Mirror fetch failed for {key}: {ex.Message}");
+                return null;
+            }
         }
 
         private static string MapRegion(string region)
