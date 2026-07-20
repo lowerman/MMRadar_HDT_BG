@@ -46,6 +46,11 @@ namespace MMRadar.Engine
         private bool _lastFetchFailed;
         private int _fetchRetries;
         private DateTime _nextRetryAtUtc = DateTime.MinValue;
+        // Official-board retries run on their OWN budget: a mirror hiccup must not
+        // consume the wallii retry allowance (and vice versa).
+        private bool _boardMissing;
+        private int _boardRetries;
+        private DateTime _nextBoardRetryAtUtc = DateTime.MinValue;
         private bool _previewActive;
         private int _previewGeneration;
         private SettingsWindow _settingsWindow;
@@ -228,6 +233,19 @@ namespace MMRadar.Engine
                         _ = FetchLobbyStatsAsync(_lobby, generation);
                     }
 
+                    // Transient official-board failure: dash rows are curable, so the
+                    // board gets its own in-game retries (30/60/120 s). The summaries
+                    // come from the 5-min wallii cache — only the board HTTP re-fires.
+                    if (_phase == Phase.Loaded && _boardMissing && _boardRetries < 3 &&
+                        DateTime.UtcNow >= _nextBoardRetryAtUtc && _lobby != null)
+                    {
+                        _boardMissing = false; // the fetch below re-evaluates it
+                        _boardRetries++;
+                        _phase = Phase.Fetching;
+                        var generation = ++_fetchGeneration;
+                        _ = FetchLobbyStatsAsync(_lobby, generation);
+                    }
+
                     // A partial roster (e.g. right after a reconnect) keeps improving as
                     // more names surface, and a roster accepted from stale metadata is
                     // replaced once HDT surfaces the real lobby of a NEW game (its
@@ -277,6 +295,10 @@ namespace MMRadar.Engine
                 summaries = lobby.Players
                     .Select(p => new PlayerSummary { LobbyName = p.Name, OnLeaderboard = false })
                     .ToList();
+                // Degrade like BGrank instead of a dead panel: a wallii outage
+                // still yields official-board ratings (usually served from cache).
+                await _wallii.TryFillOfficialRatingsAsync(summaries, lobby.Region, lobby.GameMode)
+                    .ConfigureAwait(false);
             }
 
             // Decorate with in-game info. The stats list preserves roster order, so
@@ -300,11 +322,18 @@ namespace MMRadar.Engine
                 }
             }
 
+            var boardMissing = _wallii.LastBoardMissing && lobby.Region != null;
             RunOnUi(() =>
             {
                 if (generation != _fetchGeneration)
                     return;
                 _phase = Phase.Loaded;
+                // Arm (or disarm) the board retry loop; the backoff doubles per try.
+                _boardMissing = boardMissing;
+                if (boardMissing)
+                    _nextBoardRetryAtUtc = DateTime.UtcNow.AddSeconds(30 << _boardRetries);
+                else
+                    _boardRetries = 0;
                 _panel.SetStats(summaries);
                 if (statusMessage != null)
                     _panel.SetStatus(statusMessage);
@@ -543,6 +572,8 @@ namespace MMRadar.Engine
             _popupGeneration++;
             _lastFetchFailed = false;
             _fetchRetries = 0;
+            _boardMissing = false;
+            _boardRetries = 0;
             _spectateNoticeShown = false;
             // Whatever lobby info HDT still holds now belongs to the finished game.
             _tracker.MarkCurrentLobbyInfoStale();

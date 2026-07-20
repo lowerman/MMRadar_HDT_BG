@@ -87,12 +87,23 @@ namespace MMRadar.Wallii
             // The official leaderboard mirror serves two jobs: plain ratings for
             // players wallii does not track, and the authoritative CURRENT rating
             // for the ones it does (wallii can lag by days for lapsed players).
-            await FillFallbackRatingsAsync(summaries, preferredRegion, gameMode).ConfigureAwait(false);
+            await TryFillOfficialRatingsAsync(summaries, preferredRegion, gameMode).ConfigureAwait(false);
 
             return summaries;
         }
 
-        private async Task FillFallbackRatingsAsync(
+        /// <summary>
+        /// True when the last board fill could not obtain a board for a KNOWN
+        /// region — the caller may retry later in the game (dashes are curable).
+        /// </summary>
+        public bool LastBoardMissing { get; private set; }
+
+        /// <summary>
+        /// Fills official-board data into the summaries: ratings for untracked
+        /// players, rating authority + the identity gate for tracked ones. Public
+        /// so the wallii-outage path can degrade to board-only ratings.
+        /// </summary>
+        public async Task TryFillOfficialRatingsAsync(
             List<PlayerSummary> summaries, string region, string gameMode)
         {
             if (_board == null || region == null || summaries.Count == 0)
@@ -100,8 +111,11 @@ namespace MMRadar.Wallii
             try
             {
                 var board = await _board.GetBoardAsync(region, gameMode == "1").ConfigureAwait(false);
+                LastBoardMissing = board == null;
                 if (board == null)
                     return;
+
+                var namesakeCandidates = new List<(PlayerSummary S, int Official)>();
                 foreach (var s in summaries)
                 {
                     if (s.OnLeaderboard)
@@ -111,10 +125,37 @@ namespace MMRadar.Wallii
                         // keeps carrying their last seen value forward for days.
                         // Positive evidence only — a name absent from the board must
                         // never downgrade a tracked player (name spaces can differ).
-                        if (board.TryGetRating(s.LobbyName, out var official))
+                        if (board.TryGetRating(s.LobbyName, out var official, out var exactCase))
                         {
-                            s.Rating = official;
-                            s.Rank = board.RankOf(official);
+                            // A case-folded hit on a case-AMBIGUOUS name cannot say
+                            // which of the case-twins it found — leave wallii's value.
+                            if (exactCase || !board.IsCaseAmbiguous(s.LobbyName))
+                            {
+                                s.Rating = official;
+                                s.Rank = board.RankOf(official);
+                            }
+
+                            // Identity gate: the official rating of the player at THIS
+                            // table must be compatible with the wallii identity's recent
+                            // trajectory; a huge gap means the stats belong to a namesake.
+                            // Evidence-grade inputs only: exact-case hit, live-fetched
+                            // board, same region, an envelope to compare against.
+                            if (exactCase && board.FromLiveFetch && s.RegionIsCurrent &&
+                                s.Envelope10Min != null && s.Envelope10Max != null)
+                            {
+                                var distance = official < s.Envelope10Min.Value
+                                    ? s.Envelope10Min.Value - official
+                                    : official > s.Envelope10Max.Value
+                                        ? official - s.Envelope10Max.Value
+                                        : 0;
+                                var staleDays = s.LastSnapshotUtc == null
+                                    ? 10.0
+                                    : Math.Min(10.0, Math.Max(0.0,
+                                        (DateTimeOffset.UtcNow - s.LastSnapshotUtc.Value).TotalDays));
+                                var slack = 1000 + (int)(150 * staleDays);
+                                if (distance > slack)
+                                    namesakeCandidates.Add((s, official));
+                            }
                         }
                         continue;
                     }
@@ -129,6 +170,31 @@ namespace MMRadar.Wallii
                     {
                         s.BelowCutoff = true;
                     }
+                }
+
+                // Lobby-wide guard: three or more simultaneous "namesakes" is not a
+                // coincidence — it is a systemic divergence (a season reset, a stale
+                // data source). Trust nothing the gate says in that case.
+                if (namesakeCandidates.Count >= 3)
+                {
+                    Util.Logger.Info(
+                        $"Identity gate suppressed: {namesakeCandidates.Count} simultaneous mismatches (systemic)");
+                    return;
+                }
+                foreach (var (s, official) in namesakeCandidates)
+                {
+                    Util.Logger.Info(
+                        $"Identity gate: '{s.LobbyName}' board {official} vs wallii envelope " +
+                        $"[{s.Envelope10Min}..{s.Envelope10Max}] — stats hidden as a suspected namesake");
+                    // Demote to the existing rating-only row state: every consumer
+                    // (sort, header average, click gating, live dot) follows along.
+                    s.NamesakeSuspected = true;
+                    s.NamesakeWalliiRating = s.Envelope10Max;
+                    s.OnLeaderboard = false;
+                    s.FallbackRating = official;
+                    s.FallbackRank = board.RankOf(official);
+                    s.IsLive = false;
+                    s.TwitchChannel = null;
                 }
             }
             catch (Exception ex)
@@ -186,6 +252,15 @@ namespace MMRadar.Wallii
                               string.Equals(r.Region, preferredRegion, StringComparison.OrdinalIgnoreCase))
                           ?? regionRows.OrderByDescending(r => r.Rating).First();
 
+                // Identity-envelope evidence: the wallii rating range over the fetched
+                // ~10 days in the CHOSEN region (later widened by snapshots). Costs
+                // nothing — the daily rows are already in hand.
+                var chosenRegionRatings = stats
+                    .Where(r => r.PlayerId == player.PlayerId &&
+                                string.Equals(r.Region, row.Region, StringComparison.OrdinalIgnoreCase))
+                    .Select(r => r.Rating)
+                    .ToList();
+
                 channelByPlayer.TryGetValue(lower[name], out var channel);
 
                 result[name] = new PlayerSummary
@@ -203,6 +278,9 @@ namespace MMRadar.Wallii
                     GamesWeek = row.WeeklyGamesPlayed,
                     IsLive = channel?.Live ?? false,
                     TwitchChannel = channel?.Channel,
+                    RegionIsCurrent = string.Equals(row.Region, preferredRegion, StringComparison.OrdinalIgnoreCase),
+                    Envelope10Min = chosenRegionRatings.Count > 0 ? chosenRegionRatings.Min() : (int?)null,
+                    Envelope10Max = chosenRegionRatings.Count > 0 ? chosenRegionRatings.Max() : (int?)null,
                 };
             }
 
@@ -226,6 +304,17 @@ namespace MMRadar.Wallii
                     var snapshots = await _api
                         .GetSnapshotsAsync(s.PlayerId, s.Region, gameMode, limit: 200)
                         .ConfigureAwait(false);
+                    if (snapshots.Count > 0)
+                    {
+                        // Snapshot times are the honest staleness signal, and the
+                        // snapshot ratings widen the identity envelope (same region
+                        // as the summary — the query is keyed by s.Region).
+                        s.LastSnapshotUtc = snapshots.Max(x => x.SnapshotTime);
+                        var lo = snapshots.Min(x => x.Rating);
+                        var hi = snapshots.Max(x => x.Rating);
+                        s.Envelope10Min = s.Envelope10Min == null ? lo : Math.Min(s.Envelope10Min.Value, lo);
+                        s.Envelope10Max = s.Envelope10Max == null ? hi : Math.Max(s.Envelope10Max.Value, hi);
+                    }
                     var records = PlacementEstimator.BuildGameRecords(snapshots);
                     var localToday = DateTime.Now.Date;
                     var today = records.Where(r => r.At.ToLocalTime().Date == localToday).ToList();
@@ -387,6 +476,13 @@ namespace MMRadar.Wallii
             FallbackRating = s.FallbackRating,
             FallbackRank = s.FallbackRank,
             BelowCutoff = s.BelowCutoff,
+            // Identity-envelope evidence persists through the cache; the per-call
+            // display flags (NamesakeSuspected etc.) deliberately do NOT — every
+            // call re-evaluates them against the current board.
+            Envelope10Min = s.Envelope10Min,
+            Envelope10Max = s.Envelope10Max,
+            LastSnapshotUtc = s.LastSnapshotUtc,
+            RegionIsCurrent = s.RegionIsCurrent,
         };
 
         private static async Task WrapNonCritical(Task task)

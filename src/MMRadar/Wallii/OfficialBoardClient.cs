@@ -16,13 +16,22 @@ namespace MMRadar.Wallii
         private readonly int[] _ratingsAscending;
         private readonly Dictionary<string, int> _exact;
         private readonly Dictionary<string, int> _folded;
+        private readonly HashSet<string> _caseAmbiguous;
 
         public int Count => _ratingsAscending.Length;
 
-        public OfficialBoard(Dictionary<string, int> exact, Dictionary<string, int> folded)
+        /// <summary>False when this board was read from the offline disk copy —
+        /// evidence-grade decisions (the identity gate) require a live fetch.</summary>
+        public bool FromLiveFetch { get; }
+
+        public OfficialBoard(
+            Dictionary<string, int> exact, Dictionary<string, int> folded,
+            HashSet<string> caseAmbiguous, bool fromLiveFetch)
         {
             _exact = exact;
             _folded = folded;
+            _caseAmbiguous = caseAmbiguous;
+            FromLiveFetch = fromLiveFetch;
             _ratingsAscending = exact.Values.ToArray();
             Array.Sort(_ratingsAscending);
         }
@@ -34,7 +43,17 @@ namespace MMRadar.Wallii
         /// lookup is only a fallback for sources that lost the original case.
         /// </summary>
         public bool TryGetRating(string name, out int rating) =>
-            _exact.TryGetValue(name, out rating) || _folded.TryGetValue(name, out rating);
+            TryGetRating(name, out rating, out _);
+
+        public bool TryGetRating(string name, out int rating, out bool exactCase)
+        {
+            exactCase = _exact.TryGetValue(name, out rating);
+            return exactCase || _folded.TryGetValue(name, out rating);
+        }
+
+        /// <summary>True when the board holds two or more case-variants of this
+        /// name — a folded match then cannot say WHICH player it found.</summary>
+        public bool IsCaseAmbiguous(string name) => _caseAmbiguous.Contains(name);
 
         /// <summary>1-based rank for a rating; ties share the better rank.</summary>
         public int RankOf(int rating)
@@ -110,6 +129,7 @@ namespace MMRadar.Wallii
                 return hit.Board;
 
             string text = null;
+            var live = true;
             try
             {
                 text = await _http.GetStringAsync($"{_baseUrl}/{key}/").ConfigureAwait(false);
@@ -118,6 +138,7 @@ namespace MMRadar.Wallii
             catch (Exception ex)
             {
                 Logger.Debug($"Official board fetch failed for {key}: {ex.Message}");
+                live = false;
                 text = LoadOfflineCopy(key);
                 if (text == null)
                 {
@@ -126,7 +147,7 @@ namespace MMRadar.Wallii
                 }
             }
 
-            var board = Parse(text);
+            var board = Parse(text, live);
             if (board == null || board.Count == 0)
                 return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
 
@@ -134,7 +155,7 @@ namespace MMRadar.Wallii
             return board;
         }
 
-        private static OfficialBoard Parse(string text)
+        private static OfficialBoard Parse(string text, bool fromLiveFetch)
         {
             // Format (see BGrank_bot): lines of "playerName rating" separated by
             // "\n<br />", sorted by rating descending. Names are kept CASE-EXACT
@@ -142,6 +163,7 @@ namespace MMRadar.Wallii
             // keeps the first (highest-rated) entry per key.
             var exact = new Dictionary<string, int>(StringComparer.Ordinal);
             var folded = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var caseAmbiguous = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var line in text.Split(new[] { "\n<br />" }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var idx = line.LastIndexOf(' ');
@@ -153,11 +175,17 @@ namespace MMRadar.Wallii
                 if (!int.TryParse(line.Substring(idx + 1).Trim(), out var rating))
                     continue;
                 if (!exact.ContainsKey(name))
+                {
                     exact[name] = rating;
+                    // A second distinct case-variant of an already-folded name means
+                    // a folded lookup can no longer identify which player it hits.
+                    if (folded.ContainsKey(name))
+                        caseAmbiguous.Add(name);
+                }
                 if (!folded.ContainsKey(name))
                     folded[name] = rating;
             }
-            return new OfficialBoard(exact, folded);
+            return new OfficialBoard(exact, folded, caseAmbiguous, fromLiveFetch);
         }
 
         private static string MapRegion(string region)

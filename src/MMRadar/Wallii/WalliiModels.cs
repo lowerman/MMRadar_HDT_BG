@@ -141,6 +141,31 @@ namespace MMRadar.Wallii
         /// </summary>
         public bool BelowCutoff { get; set; }
 
+        // --- identity-envelope evidence (computed at fetch time, cached) ---
+
+        /// <summary>Min/max wallii rating over the last ~10 days in this row's region
+        /// (daily rows + snapshots). The identity gate compares the official board
+        /// value against this range: a lobby player can't sit far outside it.</summary>
+        public int? Envelope10Min { get; set; }
+        public int? Envelope10Max { get; set; }
+
+        /// <summary>Newest wallii snapshot time — the honest staleness signal
+        /// (daily rows carry frozen ratings forward, snapshot times do not lie).</summary>
+        public DateTimeOffset? LastSnapshotUtc { get; set; }
+
+        /// <summary>True when this row's stats come from the same region as the lobby.</summary>
+        public bool RegionIsCurrent { get; set; }
+
+        // --- per-call display flags (never cached, set while filling board data) ---
+
+        /// <summary>The board rating is incompatible with the wallii identity's recent
+        /// trajectory — the stats almost certainly belong to a namesake, so the row
+        /// was demoted to rating-only display.</summary>
+        public bool NamesakeSuspected { get; set; }
+
+        /// <summary>The (probably unrelated) wallii identity's rating, for the tooltip.</summary>
+        public int? NamesakeWalliiRating { get; set; }
+
         /// <summary>Best available average placement (day, falling back to week).</summary>
         public double? BestAvg => WeekAvg ?? DayAvg;
     }

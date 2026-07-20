@@ -120,10 +120,16 @@ namespace MMRadar.UI
                 // On the official leaderboard, but not tracked by wallii: rating plus a
                 // rank computed from the full board (tooltip); no clickable dossier.
                 vm.RatingText = UiHelpers.FormatRating(s.FallbackRating.Value);
-                vm.TooltipText = (s.FallbackRank != null
-                                     ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
-                                     : "Official leaderboard rating\n") +
-                                 "Detailed stats are only available for wallii-tracked players";
+                vm.TooltipText = s.NamesakeSuspected
+                    ? (s.FallbackRank != null
+                          ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
+                          : "Official leaderboard rating\n") +
+                      $"wallii tracks a player with this name at {UiHelpers.FormatRating(s.NamesakeWalliiRating ?? 0)} — " +
+                      "likely a different person, so their stats are hidden"
+                    : (s.FallbackRank != null
+                          ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
+                          : "Official leaderboard rating\n") +
+                      "Detailed stats are only available for wallii-tracked players";
             }
             else if (s.BelowCutoff)
             {
