@@ -99,8 +99,29 @@ namespace MMRadar.UI
 
         public static ThemePalette Current { get; private set; } = Hdt;
 
+        /// <summary>
+        /// Avg column presentation: "classic" bright solid chips (default),
+        /// "tint" translucent chips in the native diverging scale,
+        /// "bare" no chips — colored digits only.
+        /// </summary>
+        public static string ChipStyle { get; private set; } = "classic";
+
         /// <summary>Raised after the current theme changes; UI re-applies its resources.</summary>
         public static event Action ThemeChanged;
+
+        /// <summary>Switches the avg presentation and re-renders every listener.</summary>
+        public static void ApplyChipStyle(string key)
+        {
+            ChipStyle = key == "tint" || key == "bare" ? key : "classic";
+            try
+            {
+                ThemeChanged?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                Util.Logger.Error("ThemeChanged handler failed", ex);
+            }
+        }
 
         public static void Apply(string key)
         {

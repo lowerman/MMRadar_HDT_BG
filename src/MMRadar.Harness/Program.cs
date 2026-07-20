@@ -46,6 +46,7 @@ namespace MMRadar.Harness
                     case "--duo": duo = true; break;
                     case "--collapsed": collapsed = true; break;
                     case "--theme": MMRadar.UI.ThemeManager.Apply(args[++i]); break;
+                    case "--chips": MMRadar.UI.ThemeManager.ApplyChipStyle(args[++i]); break;
                     case "--region": region = args[++i]; break;
                     case "--mode": mode = args[++i]; break;
                     case "--scale":
@@ -96,7 +97,8 @@ namespace MMRadar.Harness
 
             var panel = new LobbyPanel { PanelScale = scale, SortAscending = asc };
             var popup = new PlayerDetailsPopup { PanelScale = scale };
-            var settingsCard = new SettingsCard(() => { }, () => { }, k => { }, b => { })
+            var settingsCard = new SettingsCard(() => { }, () => { }, k => { }, b => { },
+                k => MMRadar.UI.ThemeManager.ApplyChipStyle(k))
             {
                 Visibility = Visibility.Collapsed,
                 CardScale = scale,
@@ -113,7 +115,7 @@ namespace MMRadar.Harness
             // The gear toggles the in-overlay card, exactly like in HDT.
             panel.SettingsRequested += () =>
             {
-                settingsCard.Sync("hdt", asc);
+                settingsCard.Sync("hdt", asc, MMRadar.UI.ThemeManager.ChipStyle);
                 popup.Visibility = Visibility.Collapsed;
                 settingsCard.Visibility = settingsCard.Visibility == Visibility.Visible
                     ? Visibility.Collapsed
@@ -208,7 +210,7 @@ namespace MMRadar.Harness
 
                     if (showCard)
                     {
-                        settingsCard.Sync("hdt", asc);
+                        settingsCard.Sync("hdt", asc, MMRadar.UI.ThemeManager.ChipStyle);
                         popup.Visibility = Visibility.Collapsed;
                         settingsCard.Visibility = Visibility.Visible;
                     }

@@ -79,10 +79,27 @@ namespace MMRadar.UI
                 vm.RatingText = UiHelpers.FormatRating(s.Rating);
                 vm.AvgText = UiHelpers.FormatAvg(s.BestAvg);
                 var theme = ThemeManager.Current;
+                var style = ThemeManager.ChipStyle;
                 if (s.BestAvg == null)
                 {
-                    vm.AvgBrush = ThemeManager.Freeze(theme.ChipBackground);
+                    vm.AvgBrush = style == "bare"
+                        ? Brushes.Transparent
+                        : ThemeManager.Freeze(theme.ChipBackground);
                     vm.AvgTextBrush = ThemeManager.Freeze(theme.TextMuted);
+                }
+                else if (style == "tint")
+                {
+                    // Native diverging scale on a translucent tint: the chip speaks
+                    // the same green/red the header delta already uses.
+                    var c = UiHelpers.NativeAvgColor(s.BestAvg.Value);
+                    vm.AvgBrush = ThemeManager.Freeze(Color.FromArgb(0x2C, c.R, c.G, c.B));
+                    vm.AvgTextBrush = ThemeManager.Freeze(c);
+                }
+                else if (style == "bare")
+                {
+                    // No chip at all — colored digits only, like the header delta.
+                    vm.AvgBrush = Brushes.Transparent;
+                    vm.AvgTextBrush = UiHelpers.NativeAvgBrush(s.BestAvg.Value);
                 }
                 else if (theme.FilledChips)
                 {

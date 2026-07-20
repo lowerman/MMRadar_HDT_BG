@@ -76,13 +76,14 @@ namespace MMRadar.Engine
                 _settings.Save();
             };
             ThemeManager.Apply(_settings.Theme);
+            ThemeManager.ApplyChipStyle(_settings.ChipStyle);
             _wallii = new WalliiService(
                 new WalliiApi(_settings.WalliiBaseUrl, _settings.WalliiAnonKey),
                 new OfficialBoardClient(_settings.OfficialBoardUrl, dir));
 
             _panel = new LobbyPanel { Visibility = System.Windows.Visibility.Collapsed };
             _popup = new PlayerDetailsPopup { Visibility = System.Windows.Visibility.Collapsed };
-            _settingsCard = new SettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending)
+            _settingsCard = new SettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending, SetChipStyle)
             {
                 Visibility = System.Windows.Visibility.Collapsed,
             };
@@ -437,7 +438,7 @@ namespace MMRadar.Engine
                 }
                 _popupGeneration++; // cancel an in-flight dossier fetch re-showing the popup
                 _popup.Visibility = System.Windows.Visibility.Collapsed;
-                _settingsCard.Sync(_settings.Theme, _settings.SortAscending);
+                _settingsCard.Sync(_settings.Theme, _settings.SortAscending, _settings.ChipStyle);
                 _settingsCard.CardScale = _panel.PanelScale;
                 PositionCardNextToPanel(_settingsCard, 292);
                 _settingsCard.Visibility = System.Windows.Visibility.Visible;
@@ -463,7 +464,8 @@ namespace MMRadar.Engine
                 }
                 _settingsWindow = new SettingsWindow(
                     ToggleOverlay, ResetPosition, _settings.Theme, SetTheme,
-                    _settings.SortAscending, SetSortAscending);
+                    _settings.SortAscending, SetSortAscending,
+                    _settings.ChipStyle, SetChipStyle);
                 try { _settingsWindow.Owner = HdtCore.MainWindow; }
                 catch { /* owner is optional */ }
                 _settingsWindow.Show();
@@ -486,6 +488,13 @@ namespace MMRadar.Engine
             _settings.SortAscending = ascending;
             _settings.Save();
             _panel.SortAscending = ascending; // re-sorts the current lobby in place
+        }
+
+        public void SetChipStyle(string key)
+        {
+            _settings.ChipStyle = key;
+            _settings.Save();
+            ThemeManager.ApplyChipStyle(key); // re-renders rows and the dossier live
         }
 
         public bool OverlayEnabled

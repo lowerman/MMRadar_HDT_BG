@@ -19,18 +19,20 @@ namespace MMRadar.UI
             Action togglePreview,
             Action resetPosition,
             Action<string> onThemeSelected,
-            Action<bool> onSortChanged)
+            Action<bool> onSortChanged,
+            Action<string> onChipStyleSelected)
         {
             InitializeComponent();
             Body.PreviewClicked += () => togglePreview?.Invoke();
             Body.ResetClicked += () => resetPosition?.Invoke();
             Body.ThemeSelected += key => onThemeSelected?.Invoke(key);
             Body.SortChanged += asc => onSortChanged?.Invoke(asc);
+            Body.ChipStyleSelected += key => onChipStyleSelected?.Invoke(key);
         }
 
         /// <summary>Refreshes highlighted choices; call right before showing.</summary>
-        public void Sync(string currentTheme, bool sortAscending) =>
-            Body.Sync(currentTheme, sortAscending);
+        public void Sync(string currentTheme, bool sortAscending, string chipStyle) =>
+            Body.Sync(currentTheme, sortAscending, chipStyle);
 
         /// <summary>
         /// Matches the panel's zoom. A LayoutTransform (not RenderTransform)

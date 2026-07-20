@@ -13,6 +13,7 @@ namespace MMRadar.UI
     {
         public event Action<string> ThemeSelected;
         public event Action<bool> SortChanged;
+        public event Action<string> ChipStyleSelected;
         public event Action PreviewClicked;
         public event Action ResetClicked;
 
@@ -22,10 +23,11 @@ namespace MMRadar.UI
         }
 
         /// <summary>Refreshes the highlighted choices (call every time the host is shown).</summary>
-        public void Sync(string currentTheme, bool sortAscending)
+        public void Sync(string currentTheme, bool sortAscending, string chipStyle)
         {
             HighlightTheme(currentTheme);
             HighlightSort(sortAscending);
+            HighlightChips(chipStyle);
         }
 
         private void Preview_Click(object sender, RoutedEventArgs e) => PreviewClicked?.Invoke();
@@ -67,6 +69,26 @@ namespace MMRadar.UI
             var gold = (Brush)Resources["AccentGold"];
             Mark(SortDescButton, !ascending, gold);
             Mark(SortAscButton, ascending, gold);
+        }
+
+        private void ChipsClassic_Click(object sender, RoutedEventArgs e) => SelectChips("classic");
+
+        private void ChipsTint_Click(object sender, RoutedEventArgs e) => SelectChips("tint");
+
+        private void ChipsBare_Click(object sender, RoutedEventArgs e) => SelectChips("bare");
+
+        private void SelectChips(string key)
+        {
+            HighlightChips(key);
+            ChipStyleSelected?.Invoke(key);
+        }
+
+        private void HighlightChips(string key)
+        {
+            var gold = (Brush)Resources["AccentGold"];
+            Mark(ChipsClassicButton, key != "tint" && key != "bare", gold);
+            Mark(ChipsTintButton, key == "tint", gold);
+            Mark(ChipsBareButton, key == "bare", gold);
         }
 
         private static void Mark(Button button, bool selected, Brush accent)

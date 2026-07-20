@@ -22,6 +22,33 @@ namespace MMRadar.UI
             return brush;
         }
 
+        /// <summary>
+        /// Diverging avg scale built from the panel's OWN semantic anchors — the
+        /// green/red the header delta already wears — with a neutral middle for
+        /// unremarkable results. Steps are OKLab interpolations toward gray,
+        /// verified to hold WCAG >= 4.5:1 as text on both panel surfaces
+        /// (including over their own 0x2C tint).
+        /// </summary>
+        public static Color NativeAvgColor(double avg)
+        {
+            if (avg < 2.5) return (Color)ColorConverter.ConvertFromString("#FF2FBF83");
+            if (avg < 3.2) return (Color)ColorConverter.ConvertFromString("#FF73B697");
+            if (avg < 4.0) return (Color)ColorConverter.ConvertFromString("#FFA2A8AE");
+            if (avg < 4.8) return (Color)ColorConverter.ConvertFromString("#FFDC9493");
+            return (Color)ColorConverter.ConvertFromString("#FFFF7A7A");
+        }
+
+        public static Brush NativeAvgBrush(double avg)
+        {
+            var brush = new SolidColorBrush(NativeAvgColor(avg));
+            brush.Freeze();
+            return brush;
+        }
+
+        /// <summary>Avg color in the user's chosen chip style (dossier big number etc.).</summary>
+        public static Brush AvgSemanticBrush(double avg) =>
+            ThemeManager.ChipStyle == "classic" ? AvgPlacementBrush(avg) : NativeAvgBrush(avg);
+
         /// <summary>Translucent tint of the placement color, for airy chip backgrounds.</summary>
         public static Brush AvgPlacementTintBrush(double avg, byte alpha = 0x2C)
         {

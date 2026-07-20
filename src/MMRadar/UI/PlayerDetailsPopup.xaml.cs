@@ -117,7 +117,7 @@ namespace MMRadar.UI
             if (details.RecentAvg != null)
             {
                 BigAvgText.Text = UiHelpers.FormatAvg(details.RecentAvg);
-                BigAvgText.Foreground = UiHelpers.AvgPlacementBrush(details.RecentAvg.Value);
+                BigAvgText.Foreground = UiHelpers.AvgSemanticBrush(details.RecentAvg.Value);
             }
             else
             {

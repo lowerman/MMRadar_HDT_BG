@@ -16,14 +16,17 @@ namespace MMRadar.UI
             string currentTheme,
             Action<string> onThemeSelected,
             bool sortAscending,
-            Action<bool> onSortChanged)
+            Action<bool> onSortChanged,
+            string chipStyle = "classic",
+            Action<string> onChipStyleSelected = null)
         {
             InitializeComponent();
             Body.PreviewClicked += () => togglePreview?.Invoke();
             Body.ResetClicked += () => resetPosition?.Invoke();
             Body.ThemeSelected += key => onThemeSelected?.Invoke(key);
             Body.SortChanged += asc => onSortChanged?.Invoke(asc);
-            Body.Sync(currentTheme, sortAscending);
+            Body.ChipStyleSelected += key => onChipStyleSelected?.Invoke(key);
+            Body.Sync(currentTheme, sortAscending, chipStyle);
         }
     }
 }

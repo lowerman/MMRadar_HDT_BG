@@ -20,6 +20,9 @@ namespace MMRadar.Config
         /// <summary>False = highest rating on top (default); true = lowest on top, like BGRank.</summary>
         public bool SortAscending { get; set; }
 
+        /// <summary>Avg column style: "classic" solid chips, "tint" native tint, "bare" colored digits.</summary>
+        public string ChipStyle { get; set; } = "classic";
+
         /// <summary>Optional overrides in case the wallii Supabase URL or anon key rotates.</summary>
         public string WalliiBaseUrl { get; set; }
         public string WalliiAnonKey { get; set; }
