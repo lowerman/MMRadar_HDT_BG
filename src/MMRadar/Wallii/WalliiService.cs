@@ -129,32 +129,49 @@ namespace MMRadar.Wallii
                         {
                             // A case-folded hit on a case-AMBIGUOUS name cannot say
                             // which of the case-twins it found — leave wallii's value.
-                            if (exactCase || !board.IsCaseAmbiguous(s.LobbyName))
+                            var caseTrusted = exactCase || !board.IsCaseAmbiguous(s.LobbyName);
+
+                            // Shared identity evidence: how far the board value sits
+                            // from the wallii identity's recent trajectory, and how
+                            // fresh that trajectory actually is (snapshot times — the
+                            // daily-row dates lie for frozen players).
+                            var hasEnvelope = s.Envelope10Min != null && s.Envelope10Max != null;
+                            var distance = !hasEnvelope ? 0
+                                : official < s.Envelope10Min.Value
+                                    ? s.Envelope10Min.Value - official
+                                    : official > s.Envelope10Max.Value
+                                        ? official - s.Envelope10Max.Value
+                                        : 0;
+                            var staleDays = s.LastSnapshotUtc == null
+                                ? 10.0
+                                : Math.Min(10.0, Math.Max(0.0,
+                                    (DateTimeOffset.UtcNow - s.LastSnapshotUtc.Value).TotalDays));
+                            var slack = 1000 + (int)(150 * staleDays);
+
+                            // Freshest credible source about the RIGHT person: a STALE
+                            // board (old mirror / offline copy) must not displace a
+                            // fresher wallii value when both clearly describe the same
+                            // player. It still wins for namesakes (a gap no single
+                            // player could close) and for frozen wallii identities
+                            // (an hours-old board beats a days-old freeze).
+                            var walliiFresh = s.LastSnapshotUtc != null &&
+                                DateTimeOffset.UtcNow - s.LastSnapshotUtc.Value <= TimeSpan.FromHours(24);
+                            var keepWallii = !board.FromLiveFetch && s.RegionIsCurrent &&
+                                walliiFresh && (!hasEnvelope || distance <= slack);
+
+                            if (caseTrusted && !keepWallii)
                             {
                                 s.Rating = official;
                                 s.Rank = board.RankOf(official);
                             }
 
-                            // Identity gate: the official rating of the player at THIS
-                            // table must be compatible with the wallii identity's recent
-                            // trajectory; a huge gap means the stats belong to a namesake.
-                            // Evidence-grade inputs only: exact-case hit, live-fetched
-                            // board, same region, an envelope to compare against.
+                            // Identity gate: a huge gap means the stats belong to a
+                            // namesake. Evidence-grade inputs only: exact-case hit,
+                            // live-fetched board, same region, an envelope to compare.
                             if (exactCase && board.FromLiveFetch && s.RegionIsCurrent &&
-                                s.Envelope10Min != null && s.Envelope10Max != null)
+                                hasEnvelope && distance > slack)
                             {
-                                var distance = official < s.Envelope10Min.Value
-                                    ? s.Envelope10Min.Value - official
-                                    : official > s.Envelope10Max.Value
-                                        ? official - s.Envelope10Max.Value
-                                        : 0;
-                                var staleDays = s.LastSnapshotUtc == null
-                                    ? 10.0
-                                    : Math.Min(10.0, Math.Max(0.0,
-                                        (DateTimeOffset.UtcNow - s.LastSnapshotUtc.Value).TotalDays));
-                                var slack = 1000 + (int)(150 * staleDays);
-                                if (distance > slack)
-                                    namesakeCandidates.Add((s, official));
+                                namesakeCandidates.Add((s, official));
                             }
                         }
                         continue;
