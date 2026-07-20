@@ -20,18 +20,28 @@ namespace MMRadar.Wallii
 
         public int Count => _ratingsAscending.Length;
 
-        /// <summary>False when this board was read from the offline disk copy —
-        /// evidence-grade decisions (the identity gate) require a live fetch.</summary>
+        /// <summary>False when this board was read from the offline disk copy or a
+        /// stale mirror — evidence-grade decisions (the identity gate) require it.</summary>
         public bool FromLiveFetch { get; }
+
+        /// <summary>
+        /// When this board's data was actually TAKEN from the official ladder:
+        /// now for a live fetch, the manifest time for the GitHub mirror, the
+        /// file write time for an offline copy. Both wallii and the mirrors
+        /// observe the same official leaderboard, so the freshest observation
+        /// of a player wins — this is the board's side of that comparison.
+        /// </summary>
+        public DateTimeOffset ObservedAtUtc { get; }
 
         public OfficialBoard(
             Dictionary<string, int> exact, Dictionary<string, int> folded,
-            HashSet<string> caseAmbiguous, bool fromLiveFetch)
+            HashSet<string> caseAmbiguous, bool fromLiveFetch, DateTimeOffset observedAtUtc)
         {
             _exact = exact;
             _folded = folded;
             _caseAmbiguous = caseAmbiguous;
             FromLiveFetch = fromLiveFetch;
+            ObservedAtUtc = observedAtUtc;
             _ratingsAscending = exact.Values.ToArray();
             Array.Sort(_ratingsAscending);
         }
@@ -142,6 +152,7 @@ namespace MMRadar.Wallii
 
             string text = null;
             var live = true;
+            var observedAt = DateTimeOffset.UtcNow;
             try
             {
                 text = await _http.GetStringAsync($"{_baseUrl}/{key}/").ConfigureAwait(false);
@@ -155,21 +166,23 @@ namespace MMRadar.Wallii
                 {
                     text = mirror.Value.Text;
                     live = mirror.Value.Fresh;
+                    observedAt = mirror.Value.ObservedAt;
                     SaveOfflineCopy(key, text);
                 }
                 else
                 {
                     live = false;
-                    text = LoadOfflineCopy(key);
+                    text = LoadOfflineCopy(key, out observedAt);
                     if (text == null)
                     {
-                        // Keep serving a stale in-memory board rather than nothing.
+                        // Keep serving a stale in-memory board rather than nothing;
+                        // its ObservedAtUtc keeps the age comparison honest.
                         return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
                     }
                 }
             }
 
-            var board = Parse(text, live);
+            var board = Parse(text, live, observedAt);
             if (board == null || board.Count == 0)
                 return _cache.TryGetValue(key, out var stale) ? stale.Board : null;
 
@@ -177,7 +190,7 @@ namespace MMRadar.Wallii
             return board;
         }
 
-        private static OfficialBoard Parse(string text, bool fromLiveFetch)
+        private static OfficialBoard Parse(string text, bool fromLiveFetch, DateTimeOffset observedAtUtc)
         {
             // Format (see BGrank_bot): lines of "playerName rating" separated by
             // "\n<br />", sorted by rating descending. Names are kept CASE-EXACT
@@ -207,7 +220,7 @@ namespace MMRadar.Wallii
                 if (!folded.ContainsKey(name))
                     folded[name] = rating;
             }
-            return new OfficialBoard(exact, folded, caseAmbiguous, fromLiveFetch);
+            return new OfficialBoard(exact, folded, caseAmbiguous, fromLiveFetch, observedAtUtc);
         }
 
         /// <summary>
@@ -215,7 +228,7 @@ namespace MMRadar.Wallii
         /// unreachable or serves something that is not a board. Freshness comes
         /// from the mirror's own manifest (updated.txt: "KEY iso-utc" lines).
         /// </summary>
-        private async Task<(string Text, bool Fresh)?> TryFetchMirrorAsync(string key)
+        private async Task<(string Text, bool Fresh, DateTimeOffset ObservedAt)?> TryFetchMirrorAsync(string key)
         {
             try
             {
@@ -224,6 +237,9 @@ namespace MMRadar.Wallii
                     return null;
 
                 var fresh = false;
+                // Unknown manifest = assume old: the age comparison then prefers
+                // any fresher wallii observation, which is the safe direction.
+                var observedAt = DateTimeOffset.MinValue;
                 try
                 {
                     var manifest = await _http.GetStringAsync($"{MirrorBaseUrl}/updated.txt").ConfigureAwait(false);
@@ -234,6 +250,7 @@ namespace MMRadar.Wallii
                             DateTimeOffset.TryParse(parts[1], null,
                                 System.Globalization.DateTimeStyles.AssumeUniversal, out var at))
                         {
+                            observedAt = at;
                             fresh = DateTimeOffset.UtcNow - at <= MirrorFreshEnough;
                             break;
                         }
@@ -244,7 +261,7 @@ namespace MMRadar.Wallii
                     Logger.Debug("Mirror manifest unavailable: " + ex.Message);
                 }
                 Logger.Info($"Official board for {key} served by the GitHub mirror (fresh: {fresh})");
-                return (text, fresh);
+                return (text, fresh, observedAt);
             }
             catch (Exception ex)
             {
@@ -284,15 +301,18 @@ namespace MMRadar.Wallii
             }
         }
 
-        private string LoadOfflineCopy(string key)
+        private string LoadOfflineCopy(string key, out DateTimeOffset writtenUtc)
         {
+            writtenUtc = DateTimeOffset.MinValue;
             try
             {
                 var path = OfflinePath(key);
                 if (path == null || !File.Exists(path))
                     return null;
-                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > OfflineCopyMaxAge)
+                var written = File.GetLastWriteTimeUtc(path);
+                if (DateTime.UtcNow - written > OfflineCopyMaxAge)
                     return null;
+                writtenUtc = written;
                 return File.ReadAllText(path);
             }
             catch

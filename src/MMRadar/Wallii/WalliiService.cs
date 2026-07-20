@@ -148,16 +148,19 @@ namespace MMRadar.Wallii
                                     (DateTimeOffset.UtcNow - s.LastSnapshotUtc.Value).TotalDays));
                             var slack = 1000 + (int)(150 * staleDays);
 
-                            // Freshest credible source about the RIGHT person: a STALE
-                            // board (old mirror / offline copy) must not displace a
-                            // fresher wallii value when both clearly describe the same
-                            // player. It still wins for namesakes (a gap no single
-                            // player could close) and for frozen wallii identities
-                            // (an hours-old board beats a days-old freeze).
-                            var walliiFresh = s.LastSnapshotUtc != null &&
-                                DateTimeOffset.UtcNow - s.LastSnapshotUtc.Value <= TimeSpan.FromHours(24);
-                            var keepWallii = !board.FromLiveFetch && s.RegionIsCurrent &&
-                                walliiFresh && (!hasEnvelope || distance <= slack);
+                            // Freshest observation of the RIGHT person wins. wallii and
+                            // the board mirrors all watch the same official ladder, so
+                            // for the same player the source that saw them LATER holds
+                            // the truer number: a live fetch beats everything, a fresh
+                            // wallii snapshot beats an hours-old mirror copy, and a
+                            // frozen wallii identity loses to any newer board data.
+                            // The 30-min grace lets the board win near-ties, so the
+                            // shown value does not flip between sources on refreshes.
+                            // Namesakes (an impossible gap) always take the board value.
+                            var keepWallii = s.RegionIsCurrent &&
+                                s.LastSnapshotUtc != null &&
+                                s.LastSnapshotUtc.Value - board.ObservedAtUtc > TimeSpan.FromMinutes(30) &&
+                                (!hasEnvelope || distance <= slack);
 
                             if (caseTrusted && !keepWallii)
                             {
