@@ -25,17 +25,17 @@ namespace MMRadar.UI
         /// <summary>
         /// Diverging avg scale built from the panel's OWN semantic anchors — the
         /// green/red the header delta already wears — with a neutral middle for
-        /// unremarkable results. Steps are OKLab interpolations toward gray,
-        /// verified to hold WCAG >= 4.5:1 as text on both panel surfaces
-        /// (including over their own 0x2C tint).
+        /// unremarkable results. Soft steps are OKLab interpolations 28% toward
+        /// gray (quiet, but the arm color stays legible), verified to hold WCAG
+        /// >= 4.5:1 as text on both panel surfaces including over the 0x33 tint.
         /// </summary>
         public static Color NativeAvgColor(double avg)
         {
-            if (avg < 2.5) return (Color)ColorConverter.ConvertFromString("#FF2FBF83");
-            if (avg < 3.2) return (Color)ColorConverter.ConvertFromString("#FF73B697");
-            if (avg < 4.0) return (Color)ColorConverter.ConvertFromString("#FFA2A8AE");
-            if (avg < 4.8) return (Color)ColorConverter.ConvertFromString("#FFDC9493");
-            return (Color)ColorConverter.ConvertFromString("#FFFF7A7A");
+            if (avg < 2.5) return (Color)ColorConverter.ConvertFromString("#FF34C286");
+            if (avg < 3.2) return (Color)ColorConverter.ConvertFromString("#FF64BE94");
+            if (avg < 4.0) return (Color)ColorConverter.ConvertFromString("#FFA8AEB4");
+            if (avg < 4.8) return (Color)ColorConverter.ConvertFromString("#FFF19291");
+            return (Color)ColorConverter.ConvertFromString("#FFFF8686");
         }
 
         public static Brush NativeAvgBrush(double avg)

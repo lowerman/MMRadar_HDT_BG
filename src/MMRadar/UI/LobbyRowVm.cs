@@ -92,7 +92,7 @@ namespace MMRadar.UI
                     // Native diverging scale on a translucent tint: the chip speaks
                     // the same green/red the header delta already uses.
                     var c = UiHelpers.NativeAvgColor(s.BestAvg.Value);
-                    vm.AvgBrush = ThemeManager.Freeze(Color.FromArgb(0x2C, c.R, c.G, c.B));
+                    vm.AvgBrush = ThemeManager.Freeze(Color.FromArgb(0x33, c.R, c.G, c.B));
                     vm.AvgTextBrush = ThemeManager.Freeze(c);
                 }
                 else if (style == "bare")

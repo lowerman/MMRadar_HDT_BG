@@ -144,9 +144,9 @@
                 <StackPanel>
                     <Border Width="34" Height="18" CornerRadius="4" Background="#FF17181B"
                             BorderBrush="#4DFFFFFF" BorderThickness="1" HorizontalAlignment="Center">
-                        <Border Width="22" Height="11" CornerRadius="3" Background="#2C2FBF83"
+                        <Border Width="22" Height="11" CornerRadius="3" Background="#3334C286"
                                 HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="2.4" FontSize="7.5" FontWeight="Bold" Foreground="#FF2FBF83"
+                            <TextBlock Text="2.4" FontSize="7.5" FontWeight="Bold" Foreground="#FF34C286"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </Border>
@@ -158,7 +158,7 @@
                 <StackPanel>
                     <Border Width="34" Height="18" CornerRadius="4" Background="#FF17181B"
                             BorderBrush="#4DFFFFFF" BorderThickness="1" HorizontalAlignment="Center">
-                        <TextBlock Text="2.4" FontSize="9" FontWeight="Bold" Foreground="#FF2FBF83"
+                        <TextBlock Text="2.4" FontSize="9" FontWeight="Bold" Foreground="#FF34C286"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <TextBlock Text="Text" FontSize="10.5" HorizontalAlignment="Center" Margin="0,4,0,0"/>
