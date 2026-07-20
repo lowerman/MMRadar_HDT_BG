@@ -10,9 +10,10 @@ A [Hearthstone Deck Tracker](https://hsreplay.net/downloads/) plugin for **Battl
 - 📈 **The whole ladder covered** — wallii-tracked top players get full stats; everyone else on the official leaderboard still shows their rating (and a computed rank in the tooltip); confirmed sub-cutoff players show **<8 000**.
 - 🔍 **Player dossier on click** — recent games (estimated placement, MMR delta, resulting MMR), averages over the last ~10 games / today / last 7 days (all computed from the same data, so they never contradict each other), and an MMR trajectory chart aligned with the game list.
 - 🔤 **HUD-grade readability** — big high-contrast type with strictly tabular digits, an auto-width card that hugs its content, and resolution-aware scaling (1080p ×1.0, 1440p ×1.2, 4K ×1.6). Zooming re-renders the text, so it stays crisp at any size.
-- 🎨 **Three themes** — **HDT** (neutral grey matching the deck tracker — default), **Dark** (solid near-black, maximum contrast), **Warm** (blends with Hearthstone's look). Switch instantly in Settings.
+- 🎨 **Three themes, three avg color styles** — themes: **HDT** (neutral grey matching the deck tracker — default), **Dark** (solid near-black, maximum contrast), **Warm** (blends with Hearthstone's look). The avg column has its own style switch: **Classic** bright chips, **Tint** (quiet translucent chips in a diverging palette built from the panel's own green/red — average results stay neutral), or **Text** (no chips, colored numbers only). Everything switches instantly in Settings.
 - ⚙️ **Settings that respect the game** — the gear in the panel header opens a settings card **right on the overlay**, next to the panel: the game never loses focus, nothing pops up mid-screen, and the card hides itself when a match starts or ends.
 - 🤝 **Duos support** — teammates are grouped into pairs (alternating background bands, teams sorted by their strongest member) once the game reveals the teams; ratings, dossiers and the lobby average work in duos too.
+- 👁 **Spectate support** — spectating a ranked game shows the full lobby automatically; in private lobbies, hover the leaderboard portraits and the panel fills in player by player (dead-marking and duos bands are limited there — the game reveals only names to a spectator).
 - 🫥 **Stays out of your way** — collapse the panel into a tiny ~30%-opacity pill <img src="artifacts/screenshot-collapsed.png" alt="collapsed pill" height="22">; click the pill to expand, drag to move. Position, scale, and collapsed state persist.
 - 🧪 **Live preview** — show the overlay with the current world top-8 (real wallii data) to position and scale it without starting a game.
 
@@ -37,7 +38,7 @@ Requirements: Windows, Hearthstone Deck Tracker (the plugin resolves its assembl
 
 ## How it works
 
-- **Lobby names** come from HDT's own memory mirror (`BattlegroundsLobbyInfo` via HearthMirror), with a Power.log fallback (`PlayerID=…, PlayerName=…` lines). No portrait-hovering or extra memory-reading DLLs are needed.
+- **Lobby names** come from HDT's own memory mirror (`BattlegroundsLobbyInfo` via HearthMirror), with a Power.log fallback (`PlayerID=…, PlayerName=…` lines) — no portrait-hovering needed in your own games. Spectated private lobbies are the one exception: there the game reveals a name only when a portrait is hovered, so the panel reads the leaderboard tiles via the `untapped-scry` reader **that ships with HDT itself** (the technique HDT_BGrank pioneered) — still a single-DLL install.
 - **Stats** come from wallii.gg's public Supabase REST API — the same backend their website queries from the browser. wallii tracks the very top of the ladder, so detailed dossiers (recent games, averages) are available for those players.
 - **Ratings for everyone else** come from the full official leaderboard via [BGrank's public mirror](https://github.com/IBM5100o/BGrank_bot) (one cached request per region, 15-min TTL, offline fallback); their approximate rank is computed from the same board. Honest limitations:
   - players **below the official cutoff** (roughly 8000 MMR) show as "<8 000" and count toward the lobby average as 8 000;
