@@ -158,9 +158,14 @@ namespace MMRadar.Wallii
                             // The 30-min grace lets the board win near-ties, so the
                             // shown value does not flip between sources on refreshes.
                             // Namesakes (an impossible gap) always take the board value.
-                            var keepWallii = s.RegionIsCurrent &&
-                                s.LastSnapshotUtc != null &&
-                                s.LastSnapshotUtc.Value - board.ObservedAtUtc > TimeSpan.FromMinutes(30) &&
+                            // Unknown wallii freshness (that one snapshot query
+                            // failed): only a LIVE board may outrank it then — a
+                            // stale copy must not blindly displace a value that
+                            // may well be fresher.
+                            var walliiNewer = s.LastSnapshotUtc != null
+                                ? s.LastSnapshotUtc.Value - board.ObservedAtUtc > TimeSpan.FromMinutes(30)
+                                : !board.FromLiveFetch;
+                            var keepWallii = s.RegionIsCurrent && walliiNewer &&
                                 (!hasEnvelope || distance <= slack);
 
                             if (caseTrusted && !keepWallii)
@@ -172,8 +177,10 @@ namespace MMRadar.Wallii
                             // Identity gate: a huge gap means the stats belong to a
                             // namesake. Evidence-grade inputs only: exact-case hit,
                             // live-fetched board, same region, an envelope to compare.
+                            // The LOCAL player is exempt — their identity is the one
+                            // thing this plugin knows for certain.
                             if (exactCase && board.FromLiveFetch && s.RegionIsCurrent &&
-                                hasEnvelope && distance > slack)
+                                !s.IsLocalPlayer && hasEnvelope && distance > slack)
                             {
                                 namesakeCandidates.Add((s, official));
                             }

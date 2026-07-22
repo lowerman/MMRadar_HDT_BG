@@ -167,7 +167,9 @@ namespace MMRadar.Wallii
                     text = mirror.Value.Text;
                     live = mirror.Value.Fresh;
                     observedAt = mirror.Value.ObservedAt;
-                    SaveOfflineCopy(key, text);
+                    // The saved copy carries the mirror's TRUE observation time,
+                    // not "now" — its 48h clock must not restart on a copy.
+                    SaveOfflineCopy(key, text, observedAt);
                 }
                 else
                 {
@@ -260,6 +262,15 @@ namespace MMRadar.Wallii
                 {
                     Logger.Debug("Mirror manifest unavailable: " + ex.Message);
                 }
+                // A mirror whose age is unknown or beyond the offline-copy cap is
+                // not evidence of anything — month-old data must never surface as
+                // current ratings, nor launder itself into a fresh-looking copy.
+                if (observedAt == DateTimeOffset.MinValue ||
+                    DateTimeOffset.UtcNow - observedAt > OfflineCopyMaxAge)
+                {
+                    Logger.Debug($"Mirror data for {key} is too old or unverifiable — discarded");
+                    return null;
+                }
                 Logger.Info($"Official board for {key} served by the GitHub mirror (fresh: {fresh})");
                 return (text, fresh, observedAt);
             }
@@ -285,7 +296,7 @@ namespace MMRadar.Wallii
         private string OfflinePath(string key) =>
             _cacheDir == null ? null : Path.Combine(_cacheDir, $"leaderboard_{key}.txt");
 
-        private void SaveOfflineCopy(string key, string text)
+        private void SaveOfflineCopy(string key, string text, DateTimeOffset? observedAt = null)
         {
             try
             {
@@ -294,6 +305,8 @@ namespace MMRadar.Wallii
                     return;
                 Directory.CreateDirectory(_cacheDir);
                 File.WriteAllText(path, text);
+                if (observedAt != null)
+                    File.SetLastWriteTimeUtc(path, observedAt.Value.UtcDateTime);
             }
             catch (Exception ex)
             {

@@ -317,9 +317,11 @@ namespace MMRadar.Engine
             // simply stays on the baseline. Runs on independent clones so the
             // background fill can never race rows already handed to the UI.
             var corrected = summaries.Select(WalliiService.CloneSummary).ToList();
+            // Decoration first: the identity gate exempts the LOCAL player, so
+            // IsLocalPlayer must be known before the board layer runs.
+            DecorateWithGameInfo(corrected, lobby);
             await _wallii.TryFillOfficialRatingsAsync(corrected, lobby.Region, lobby.GameMode)
                 .ConfigureAwait(false);
-            DecorateWithGameInfo(corrected, lobby);
             var boardMissing = _wallii.LastBoardMissing && lobby.Region != null;
             RunOnUi(() =>
             {
