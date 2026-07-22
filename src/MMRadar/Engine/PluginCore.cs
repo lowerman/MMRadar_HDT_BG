@@ -295,15 +295,58 @@ namespace MMRadar.Engine
                 summaries = lobby.Players
                     .Select(p => new PlayerSummary { LobbyName = p.Name, OnLeaderboard = false })
                     .ToList();
-                // Degrade like BGrank instead of a dead panel: a wallii outage
-                // still yields official-board ratings (usually served from cache).
-                await _wallii.TryFillOfficialRatingsAsync(summaries, lobby.Region, lobby.GameMode)
-                    .ConfigureAwait(false);
             }
 
-            // Decorate with in-game info. The stats list preserves roster order, so
-            // pair positionally — a name lookup would glue lobby namesakes (same base
-            // name, different battletags) to whichever of them comes first.
+            // PHASE 1 — the wallii-only baseline paints immediately (v1.0.7 timing
+            // and semantics): a slow or unreachable leaderboard source must never
+            // delay the first render.
+            DecorateWithGameInfo(summaries, lobby);
+            RunOnUi(() =>
+            {
+                if (generation != _fetchGeneration)
+                    return;
+                _phase = Phase.Loaded;
+                _panel.SetStats(summaries);
+                if (statusMessage != null)
+                    _panel.SetStatus(statusMessage);
+            });
+
+            // PHASE 2 — the official-board layer (rating authority, case-exact
+            // namesakes, fallback ratings, wallii-outage degradation) lands as a
+            // second paint once the board arrives; if it never does, the panel
+            // simply stays on the baseline. Runs on independent clones so the
+            // background fill can never race rows already handed to the UI.
+            var corrected = summaries.Select(WalliiService.CloneSummary).ToList();
+            await _wallii.TryFillOfficialRatingsAsync(corrected, lobby.Region, lobby.GameMode)
+                .ConfigureAwait(false);
+            DecorateWithGameInfo(corrected, lobby);
+            var boardMissing = _wallii.LastBoardMissing && lobby.Region != null;
+            RunOnUi(() =>
+            {
+                if (generation != _fetchGeneration)
+                    return;
+                // Arm (or disarm) the board retry loop; the backoff doubles per try.
+                _boardMissing = boardMissing;
+                if (boardMissing)
+                    _nextBoardRetryAtUtc = DateTime.UtcNow.AddSeconds(30 << _boardRetries);
+                else
+                    _boardRetries = 0;
+                if (!boardMissing)
+                {
+                    _panel.SetStats(corrected);
+                    if (statusMessage != null)
+                        _panel.SetStatus(statusMessage);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Pairs stats with in-game info positionally — the stats list preserves
+        /// roster order, and a name lookup would glue lobby namesakes (same base
+        /// name, different battletags) to whichever of them comes first.
+        /// </summary>
+        private static void DecorateWithGameInfo(List<PlayerSummary> summaries, LobbyState lobby)
+        {
             for (var i = 0; i < summaries.Count; i++)
             {
                 var summary = summaries[i];
@@ -321,23 +364,6 @@ namespace MMRadar.Engine
                     summary.TeamId = player.TeamId;
                 }
             }
-
-            var boardMissing = _wallii.LastBoardMissing && lobby.Region != null;
-            RunOnUi(() =>
-            {
-                if (generation != _fetchGeneration)
-                    return;
-                _phase = Phase.Loaded;
-                // Arm (or disarm) the board retry loop; the backoff doubles per try.
-                _boardMissing = boardMissing;
-                if (boardMissing)
-                    _nextBoardRetryAtUtc = DateTime.UtcNow.AddSeconds(30 << _boardRetries);
-                else
-                    _boardRetries = 0;
-                _panel.SetStats(summaries);
-                if (statusMessage != null)
-                    _panel.SetStatus(statusMessage);
-            });
         }
 
         private async void OnPlayerClicked(PlayerSummary summary)

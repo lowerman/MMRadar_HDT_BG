@@ -84,10 +84,10 @@ namespace MMRadar.Wallii
                 })
                 .ToList();
 
-            // The official leaderboard mirror serves two jobs: plain ratings for
-            // players wallii does not track, and the authoritative CURRENT rating
-            // for the ones it does (wallii can lag by days for lapsed players).
-            await TryFillOfficialRatingsAsync(summaries, preferredRegion, gameMode).ConfigureAwait(false);
+            // NOTE: official-board data (rating authority, fallback ratings, the
+            // namesake gate) is deliberately NOT applied here — the caller layers
+            // it on via TryFillOfficialRatingsAsync as a SECOND paint, so a slow
+            // or unreachable board can never delay the first render.
 
             return summaries;
         }
@@ -106,6 +106,7 @@ namespace MMRadar.Wallii
         public async Task TryFillOfficialRatingsAsync(
             List<PlayerSummary> summaries, string region, string gameMode)
         {
+            LastBoardMissing = false;
             if (_board == null || region == null || summaries.Count == 0)
                 return;
             try
@@ -471,6 +472,10 @@ namespace MMRadar.Wallii
             _detailsCache[cacheKey] = new CacheEntry<PlayerDetails> { Value = details, At = DateTime.UtcNow };
             return details;
         }
+
+        /// <summary>Independent copy for the second (board) render pass, so the
+        /// background fill can never race the rows already handed to the UI.</summary>
+        public static PlayerSummary CloneSummary(PlayerSummary s) => Clone(s);
 
         private static string CacheKey(string name, string region, string mode) =>
             $"{name.ToLowerInvariant()}|{region}|{mode}";

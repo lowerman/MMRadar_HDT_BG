@@ -174,7 +174,9 @@ namespace MMRadar.Harness
                         panel.SetStatus("Loading wallii stats…");
                         var names = liveNames.Split(',').Select(n => n.Trim()).Where(n => n.Length > 0).ToList();
                         var stats = await live.GetLobbyStatsAsync(names, region, mode);
-                        panel.SetStats(stats);
+                        panel.SetStats(stats); // phase 1: wallii baseline
+                        await live.TryFillOfficialRatingsAsync(stats, region, mode);
+                        panel.SetStats(stats); // phase 2: official-board layer
                         var first = stats.FirstOrDefault(x => x.OnLeaderboard);
                         if (first != null)
                         {
