@@ -276,9 +276,37 @@ namespace MMRadar.Wallii
                     continue;
                 }
 
+                // A lobby is played on exactly ONE ladder, so only that region's row
+                // describes the player sitting in it. Another region's row is either
+                // a different person with the same name (wallii lowercases names and
+                // keeps a single identity per name — the official boards prove those
+                // collisions exist) or the same person's unrelated ladder; either way
+                // its rating, rank and averages are not this lobby's. The old "else
+                // take the region where they are rated highest" fallback is exactly
+                // what printed an NA profile for an EU lobby.
                 var row = regionRows.FirstOrDefault(r =>
-                              string.Equals(r.Region, preferredRegion, StringComparison.OrdinalIgnoreCase))
-                          ?? regionRows.OrderByDescending(r => r.Rating).First();
+                    string.Equals(r.Region, preferredRegion, StringComparison.OrdinalIgnoreCase));
+                if (row == null)
+                {
+                    if (!string.IsNullOrWhiteSpace(preferredRegion))
+                    {
+                        // Untracked on THIS ladder: the row is left to the official
+                        // board of the current region (rating only) or to the
+                        // "<8 000" state — never to a foreign region's numbers.
+                        var elsewhere = string.Join("/", regionRows
+                            .Select(r => r.Region)
+                            .Where(r => !string.IsNullOrWhiteSpace(r))
+                            .Distinct(StringComparer.OrdinalIgnoreCase));
+                        Util.Logger.Debug(
+                            $"'{name}': wallii tracks this name only on {elsewhere} — " +
+                            $"ignored for this {preferredRegion} lobby");
+                        result[name] = NotFound(name, elsewhere);
+                        continue;
+                    }
+                    // Region still unknown (HDT has not resolved it yet): best effort,
+                    // and RegionIsCurrent stays false so no trust decision leans on it.
+                    row = regionRows.OrderByDescending(r => r.Rating).First();
+                }
 
                 // Identity-envelope evidence: the wallii rating range over the fetched
                 // ~10 days in the CHOSEN region (later widened by snapshots). Costs
@@ -487,8 +515,13 @@ namespace MMRadar.Wallii
         private static string CacheKey(string name, string region, string mode) =>
             $"{name.ToLowerInvariant()}|{region}|{mode}";
 
-        private static PlayerSummary NotFound(string name) =>
-            new PlayerSummary { LobbyName = name, OnLeaderboard = false };
+        private static PlayerSummary NotFound(string name, string trackedOnRegions = null) =>
+            new PlayerSummary
+            {
+                LobbyName = name,
+                OnLeaderboard = false,
+                TrackedOnOtherRegions = trackedOnRegions,
+            };
 
         private static PlayerSummary Clone(PlayerSummary s) => new PlayerSummary
         {
@@ -515,6 +548,7 @@ namespace MMRadar.Wallii
             Envelope10Max = s.Envelope10Max,
             LastSnapshotUtc = s.LastSnapshotUtc,
             RegionIsCurrent = s.RegionIsCurrent,
+            TrackedOnOtherRegions = s.TrackedOnOtherRegions,
         };
 
         private static async Task WrapNonCritical(Task task)

@@ -74,6 +74,12 @@ namespace MMRadar.UI
             };
             var theme0 = ThemeManager.Current;
             vm.RatingBrush = ThemeManager.Freeze(theme0.RatingText);
+            // wallii knows this name, but only on other ladders — the row was left
+            // without stats on purpose, and the tooltip says so instead of letting
+            // it read as missing data.
+            var otherRegions = !s.OnLeaderboard && !string.IsNullOrEmpty(s.TrackedOnOtherRegions)
+                ? s.TrackedOnOtherRegions
+                : null;
             if (s.OnLeaderboard)
             {
                 vm.RatingText = UiHelpers.FormatRating(s.Rating);
@@ -120,31 +126,40 @@ namespace MMRadar.UI
                 // On the official leaderboard, but not tracked by wallii: rating plus a
                 // rank computed from the full board (tooltip); no clickable dossier.
                 vm.RatingText = UiHelpers.FormatRating(s.FallbackRating.Value);
-                vm.TooltipText = s.NamesakeSuspected
-                    ? (s.FallbackRank != null
-                          ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
-                          : "Official leaderboard rating\n") +
-                      $"wallii tracks a player with this name at {UiHelpers.FormatRating(s.NamesakeWalliiRating ?? 0)} — " +
-                      "likely a different person, so their stats are hidden"
-                    : (s.FallbackRank != null
-                          ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
-                          : "Official leaderboard rating\n") +
-                      "Detailed stats are only available for wallii-tracked players";
+                var rankLine = s.FallbackRank != null
+                    ? $"≈ rank #{s.FallbackRank} on the official leaderboard\n"
+                    : "Official leaderboard rating\n";
+                vm.TooltipText = rankLine +
+                    (s.NamesakeSuspected
+                        ? $"wallii tracks a player with this name at {UiHelpers.FormatRating(s.NamesakeWalliiRating ?? 0)} — " +
+                          "likely a different person, so their stats are hidden"
+                        : otherRegions != null
+                            ? OtherRegionNote(otherRegions)
+                            : "Detailed stats are only available for wallii-tracked players");
             }
             else if (s.BelowCutoff)
             {
                 // Confirmed absent from the official board: below the ~8000 cutoff.
                 vm.RatingText = "<" + UiHelpers.FormatRating(8000);
                 vm.RatingBrush = ThemeManager.Freeze(theme0.TextMuted);
-                vm.TooltipText = "Below the official leaderboard cutoff (~8 000 MMR)\nNo detailed stats available";
+                vm.TooltipText = "Below the official leaderboard cutoff (~8 000 MMR)\n" +
+                                 (otherRegions != null
+                                     ? OtherRegionNote(otherRegions)
+                                     : "No detailed stats available");
             }
             else
             {
                 vm.RatingText = "—";
                 vm.RatingBrush = ThemeManager.Freeze(theme0.TextMuted);
                 vm.TooltipText = "Rating unavailable\n(leaderboard could not be fetched)";
+                if (otherRegions != null)
+                    vm.TooltipText += "\n" + OtherRegionNote(otherRegions);
             }
             return vm;
         }
+
+        private static string OtherRegionNote(string regions) =>
+            $"wallii tracks this name on {regions} only — a different ladder, " +
+            "so those stats are not shown here";
     }
 }

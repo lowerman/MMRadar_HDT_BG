@@ -153,8 +153,17 @@ namespace MMRadar.Wallii
         /// (daily rows carry frozen ratings forward, snapshot times do not lie).</summary>
         public DateTimeOffset? LastSnapshotUtc { get; set; }
 
-        /// <summary>True when this row's stats come from the same region as the lobby.</summary>
+        /// <summary>True when this row's stats come from the same region as the lobby.
+        /// Only false when the lobby region is unknown — stats from a foreign region
+        /// are dropped at fetch time rather than displayed.</summary>
         public bool RegionIsCurrent { get; set; }
+
+        /// <summary>
+        /// Set when wallii knows this name, but only on other ladders ("NA", "AP/NA", …)
+        /// — the row was left without stats on purpose. Explains the missing chip in
+        /// the tooltip without claiming that the foreign identity is the same person.
+        /// </summary>
+        public string TrackedOnOtherRegions { get; set; }
 
         // --- per-call display flags (never cached, set while filling board data) ---
 
