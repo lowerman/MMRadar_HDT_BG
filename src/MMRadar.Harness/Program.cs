@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -29,6 +30,7 @@ namespace MMRadar.Harness
             string liveNames = null;
             var top = false;
             var duo = false;
+            var deadTest = false;
             var collapsed = false;
             var region = "EU";
             var mode = "0";
@@ -44,6 +46,7 @@ namespace MMRadar.Harness
                     case "--live": liveNames = args[++i]; break;
                     case "--top": top = true; break;
                     case "--duo": duo = true; break;
+                    case "--deadtest": deadTest = true; break;
                     case "--collapsed": collapsed = true; break;
                     case "--theme": MMRadar.UI.ThemeManager.Apply(args[++i]); break;
                     case "--chips": MMRadar.UI.ThemeManager.ApplyChipStyle(args[++i]); break;
@@ -173,7 +176,21 @@ namespace MMRadar.Harness
                     {
                         panel.SetStatus("Loading wallii stats…");
                         var names = liveNames.Split(',').Select(n => n.Trim()).Where(n => n.Length > 0).ToList();
-                        var stats = await live.GetLobbyStatsAsync(names, region, mode);
+                        List<PlayerSummary> stats;
+                        try
+                        {
+                            stats = await live.GetLobbyStatsAsync(names, region, mode);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Same degradation as the plugin: wallii down -> bare
+                            // placeholders, the board layer fills what it can.
+                            Console.WriteLine("wallii failed: " + ex.Message);
+                            stats = names
+                                .Select(n => new PlayerSummary { LobbyName = n, OnLeaderboard = false })
+                                .ToList();
+                            panel.SetStatus("wallii.gg unavailable — will retry");
+                        }
                         panel.SetStats(stats); // phase 1: wallii baseline
                         await live.TryFillOfficialRatingsAsync(stats, region, mode);
                         panel.SetStats(stats); // phase 2: official-board layer
@@ -201,6 +218,22 @@ namespace MMRadar.Harness
                                 lobby[i].TeamId = teams[i];
                         }
                         panel.SetStats(lobby);
+                        if (deadTest)
+                        {
+                            // Simulates the second (board) paint racing the death
+                            // marks: two players die, then a repaint lands — the
+                            // skulls must survive the row rebuild.
+                            var infos = lobby
+                                .Select((p, i) => new MMRadar.Game.LobbyPlayerInfo
+                                {
+                                    Name = p.LobbyName,
+                                    PlayerId = i + 1,
+                                    IsDead = i < 2,
+                                })
+                                .ToList();
+                            panel.UpdateLiveState(infos);
+                            panel.SetStats(lobby);
+                        }
                         popup.SetData(SampleData.Details(lobby[0]));
                     }
 

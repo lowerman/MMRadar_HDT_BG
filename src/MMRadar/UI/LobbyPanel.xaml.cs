@@ -207,6 +207,37 @@ namespace MMRadar.UI
 
         public void SetStats(IReadOnlyList<PlayerSummary> summaries)
         {
+            // Death flags live on the row VMs and refresh only every ~2 s
+            // (UpdateLiveState) — a repaint in between must not resurrect anyone,
+            // so they carry over from the rows being replaced. Matching mirrors
+            // UpdateLiveState: by game player id when known, by name only while
+            // it is unambiguous (namesakes without ids wait for the next refresh).
+            HashSet<int> deadIds = null;
+            HashSet<string> deadNames = null;
+            if (_rows != null && _rows.Any(r => r.IsDead))
+            {
+                deadIds = new HashSet<int>();
+                deadNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var nameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var r in _rows)
+                {
+                    var n = r.Summary?.LobbyName ?? r.Name;
+                    nameCounts.TryGetValue(n, out var c);
+                    nameCounts[n] = c + 1;
+                }
+                foreach (var r in _rows)
+                {
+                    if (!r.IsDead)
+                        continue;
+                    var id = r.Summary?.GamePlayerId ?? 0;
+                    if (id > 0)
+                        deadIds.Add(id);
+                    var n = r.Summary?.LobbyName ?? r.Name;
+                    if (nameCounts[n] == 1)
+                        deadNames.Add(n);
+                }
+            }
+
             _lastSummaries = summaries;
             _lastStatus = null;
             StatusText.Visibility = Visibility.Collapsed;
@@ -243,6 +274,16 @@ namespace MMRadar.UI
                 _rows = OrderByRating(summaries)
                     .Select(LobbyRowVm.From)
                     .ToList();
+            }
+            if (deadIds != null)
+            {
+                foreach (var row in _rows)
+                {
+                    var id = row.Summary?.GamePlayerId ?? 0;
+                    var n = row.Summary?.LobbyName ?? row.Name;
+                    if ((id > 0 && deadIds.Contains(id)) || deadNames.Contains(n))
+                        row.IsDead = true;
+                }
             }
             RowsControl.ItemsSource = _rows;
             UpdateLobbyContext(summaries);

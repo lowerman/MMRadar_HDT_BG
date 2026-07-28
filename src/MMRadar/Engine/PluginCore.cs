@@ -51,6 +51,10 @@ namespace MMRadar.Engine
         private bool _boardMissing;
         private int _boardRetries;
         private DateTime _nextBoardRetryAtUtc = DateTime.MinValue;
+        // The wallii-only baseline currently on screen (current generation). Board
+        // retries re-run just the board layer over clones of it — no wallii
+        // round-trip, no baseline repaint.
+        private List<PlayerSummary> _baseline;
         private bool _previewActive;
         private int _previewGeneration;
         private SettingsWindow _settingsWindow;
@@ -230,20 +234,21 @@ namespace MMRadar.Engine
                         _fetchRetries++;
                         _phase = Phase.Fetching;
                         var generation = ++_fetchGeneration;
-                        _ = FetchLobbyStatsAsync(_lobby, generation);
+                        _ = FetchLobbyStatsAsync(_lobby, generation, isRetry: true);
                     }
 
                     // Transient official-board failure: dash rows are curable, so the
-                    // board gets its own in-game retries (30/60/120 s). The summaries
-                    // come from the 5-min wallii cache — only the board HTTP re-fires.
+                    // board gets its own in-game retries (30/60/120 s). Board-only:
+                    // the baseline on screen is already the best wallii knowledge, so
+                    // only the board layer re-runs — no wallii round-trip, no repaint
+                    // unless the board actually delivers something.
                     if (_phase == Phase.Loaded && _boardMissing && _boardRetries < 3 &&
-                        DateTime.UtcNow >= _nextBoardRetryAtUtc && _lobby != null)
+                        DateTime.UtcNow >= _nextBoardRetryAtUtc && _lobby != null &&
+                        _baseline != null)
                     {
-                        _boardMissing = false; // the fetch below re-evaluates it
+                        _boardMissing = false; // the refill below re-evaluates it
                         _boardRetries++;
-                        _phase = Phase.Fetching;
-                        var generation = ++_fetchGeneration;
-                        _ = FetchLobbyStatsAsync(_lobby, generation);
+                        _ = RetryBoardFillAsync(_lobby, _baseline, _fetchGeneration);
                     }
 
                     // A partial roster (e.g. right after a reconnect) keeps improving as
@@ -274,7 +279,7 @@ namespace MMRadar.Engine
             }
         }
 
-        private async Task FetchLobbyStatsAsync(LobbyState lobby, int generation)
+        private async Task FetchLobbyStatsAsync(LobbyState lobby, int generation, bool isRetry = false)
         {
             List<PlayerSummary> summaries;
             string statusMessage = null;
@@ -297,6 +302,21 @@ namespace MMRadar.Engine
                     .ToList();
             }
 
+            // A retry that failed AGAIN has nothing new to say: repainting fresh
+            // placeholders would wipe the board fills already on screen and blink
+            // every row. Update the status line and leave the panel alone.
+            if (isRetry && statusMessage != null)
+            {
+                RunOnUi(() =>
+                {
+                    if (generation != _fetchGeneration)
+                        return;
+                    _phase = Phase.Loaded;
+                    _panel.SetStatus(statusMessage);
+                });
+                return;
+            }
+
             // PHASE 1 — the wallii-only baseline paints immediately (v1.0.7 timing
             // and semantics): a slow or unreachable leaderboard source must never
             // delay the first render.
@@ -306,6 +326,7 @@ namespace MMRadar.Engine
                 if (generation != _fetchGeneration)
                     return;
                 _phase = Phase.Loaded;
+                _baseline = summaries;
                 _panel.SetStats(summaries);
                 if (statusMessage != null)
                     _panel.SetStatus(statusMessage);
@@ -315,14 +336,17 @@ namespace MMRadar.Engine
             // namesakes, fallback ratings, wallii-outage degradation) lands as a
             // second paint once the board arrives; if it never does, the panel
             // simply stays on the baseline. Runs on independent clones so the
-            // background fill can never race rows already handed to the UI.
+            // background fill can never race rows already handed to the UI, and
+            // repaints only when the board actually changed something — an
+            // identical second paint would just churn the rows.
             var corrected = summaries.Select(WalliiService.CloneSummary).ToList();
             // Decoration first: the identity gate exempts the LOCAL player, so
             // IsLocalPlayer must be known before the board layer runs.
             DecorateWithGameInfo(corrected, lobby);
-            await _wallii.TryFillOfficialRatingsAsync(corrected, lobby.Region, lobby.GameMode)
+            var boardMissing = await _wallii
+                .TryFillOfficialRatingsAsync(corrected, lobby.Region, lobby.GameMode)
                 .ConfigureAwait(false);
-            var boardMissing = _wallii.LastBoardMissing && lobby.Region != null;
+            var boardChanged = BoardChangedAnything(summaries, corrected);
             RunOnUi(() =>
             {
                 if (generation != _fetchGeneration)
@@ -330,16 +354,75 @@ namespace MMRadar.Engine
                 // Arm (or disarm) the board retry loop; the backoff doubles per try.
                 _boardMissing = boardMissing;
                 if (boardMissing)
+                {
                     _nextBoardRetryAtUtc = DateTime.UtcNow.AddSeconds(30 << _boardRetries);
-                else
-                    _boardRetries = 0;
-                if (!boardMissing)
+                    return;
+                }
+                _boardRetries = 0;
+                if (boardChanged)
                 {
                     _panel.SetStats(corrected);
                     if (statusMessage != null)
                         _panel.SetStatus(statusMessage);
                 }
             });
+        }
+
+        /// <summary>
+        /// Board-only retry: re-runs the official-board layer over clones of the
+        /// baseline already on screen. The wallii data cannot have improved (its
+        /// retries are separate), so nothing else is refetched or repainted.
+        /// </summary>
+        private async Task RetryBoardFillAsync(LobbyState lobby, List<PlayerSummary> baseline, int generation)
+        {
+            try
+            {
+                var corrected = baseline.Select(WalliiService.CloneSummary).ToList();
+                DecorateWithGameInfo(corrected, lobby);
+                var boardMissing = await _wallii
+                    .TryFillOfficialRatingsAsync(corrected, lobby.Region, lobby.GameMode)
+                    .ConfigureAwait(false);
+                var boardChanged = BoardChangedAnything(baseline, corrected);
+                RunOnUi(() =>
+                {
+                    if (generation != _fetchGeneration)
+                        return;
+                    _boardMissing = boardMissing;
+                    if (boardMissing)
+                    {
+                        _nextBoardRetryAtUtc = DateTime.UtcNow.AddSeconds(30 << _boardRetries);
+                        return;
+                    }
+                    _boardRetries = 0;
+                    if (boardChanged)
+                        _panel.SetStats(corrected);
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Board retry failed", ex);
+            }
+        }
+
+        /// <summary>
+        /// True when the board layer changed anything the panel actually shows.
+        /// The compared fields are exactly the ones the fill mutates; everything
+        /// else is identical by construction (clones of the same baseline).
+        /// </summary>
+        private static bool BoardChangedAnything(
+            List<PlayerSummary> before, List<PlayerSummary> after)
+        {
+            for (var i = 0; i < before.Count && i < after.Count; i++)
+            {
+                var a = before[i];
+                var b = after[i];
+                if (a.OnLeaderboard != b.OnLeaderboard || a.Rating != b.Rating ||
+                    a.Rank != b.Rank || a.FallbackRating != b.FallbackRating ||
+                    a.FallbackRank != b.FallbackRank || a.BelowCutoff != b.BelowCutoff ||
+                    a.NamesakeSuspected != b.NamesakeSuspected)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -602,6 +685,7 @@ namespace MMRadar.Engine
             _fetchRetries = 0;
             _boardMissing = false;
             _boardRetries = 0;
+            _baseline = null;
             _spectateNoticeShown = false;
             // Whatever lobby info HDT still holds now belongs to the finished game.
             _tracker.MarkCurrentLobbyInfoStale();

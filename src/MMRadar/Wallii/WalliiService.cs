@@ -93,28 +93,24 @@ namespace MMRadar.Wallii
         }
 
         /// <summary>
-        /// True when the last board fill could not obtain a board for a KNOWN
-        /// region — the caller may retry later in the game (dashes are curable).
-        /// </summary>
-        public bool LastBoardMissing { get; private set; }
-
-        /// <summary>
         /// Fills official-board data into the summaries: ratings for untracked
         /// players, rating authority + the identity gate for tracked ones. Public
         /// so the wallii-outage path can degrade to board-only ratings.
+        /// Returns true when a board for a KNOWN region could not be obtained —
+        /// the caller may retry later in the game (dashes are curable). A return
+        /// value, not shared state: overlapping fills must not read each other's
+        /// verdicts.
         /// </summary>
-        public async Task TryFillOfficialRatingsAsync(
+        public async Task<bool> TryFillOfficialRatingsAsync(
             List<PlayerSummary> summaries, string region, string gameMode)
         {
-            LastBoardMissing = false;
             if (_board == null || region == null || summaries.Count == 0)
-                return;
+                return false;
             try
             {
                 var board = await _board.GetBoardAsync(region, gameMode == "1").ConfigureAwait(false);
-                LastBoardMissing = board == null;
                 if (board == null)
-                    return;
+                    return true;
 
                 var namesakeCandidates = new List<(PlayerSummary S, int Official)>();
                 foreach (var s in summaries)
@@ -194,8 +190,12 @@ namespace MMRadar.Wallii
                         s.FallbackRating = rating;
                         s.FallbackRank = board.RankOf(rating);
                     }
-                    else
+                    else if (board.FromLiveFetch)
                     {
+                        // Only live-grade evidence may make the NEGATIVE claim
+                        // "below the cutoff" — a name missing from a day-old copy
+                        // proves nothing about today. Positive hits above still
+                        // count: a rating that existed is a fact, just an old one.
                         s.BelowCutoff = true;
                     }
                 }
@@ -207,7 +207,7 @@ namespace MMRadar.Wallii
                 {
                     Util.Logger.Info(
                         $"Identity gate suppressed: {namesakeCandidates.Count} simultaneous mismatches (systemic)");
-                    return;
+                    return false;
                 }
                 foreach (var (s, official) in namesakeCandidates)
                 {
@@ -223,11 +223,19 @@ namespace MMRadar.Wallii
                     s.FallbackRank = board.RankOf(official);
                     s.IsLive = false;
                     s.TwitchChannel = null;
+                    // The wallii identity was just declared a DIFFERENT person —
+                    // its display name must go too, or the row shows the other
+                    // twin's casing ("Pacific" on the row of "pacific").
+                    s.DisplayName = null;
                 }
+                return false;
             }
             catch (Exception ex)
             {
+                // The board itself was obtained — the failure is in the fill, and
+                // a retry would replay it, so this does not count as "missing".
                 Util.Logger.Debug("Official-board rating fill failed: " + ex.Message);
+                return false;
             }
         }
 
