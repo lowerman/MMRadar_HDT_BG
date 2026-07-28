@@ -31,6 +31,7 @@ namespace MMRadar.Harness
             var top = false;
             var duo = false;
             var deadTest = false;
+            var walliiDown = false;
             var collapsed = false;
             var region = "EU";
             var mode = "0";
@@ -47,6 +48,9 @@ namespace MMRadar.Harness
                     case "--top": top = true; break;
                     case "--duo": duo = true; break;
                     case "--deadtest": deadTest = true; break;
+                    // Total wallii outage sim: a non-routable address that hangs
+                    // until the client timeout, exactly like a real blackout.
+                    case "--walliidown": walliiDown = true; break;
                     case "--collapsed": collapsed = true; break;
                     case "--theme": MMRadar.UI.ThemeManager.Apply(args[++i]); break;
                     case "--chips": MMRadar.UI.ThemeManager.ApplyChipStyle(args[++i]); break;
@@ -127,7 +131,9 @@ namespace MMRadar.Harness
 
             WalliiService live = null;
             if (liveNames != null || top)
-                live = new WalliiService(new WalliiApi(), new OfficialBoardClient());
+                live = new WalliiService(
+                    new WalliiApi(walliiDown ? "https://10.255.255.1/rest/v1" : null),
+                    new OfficialBoardClient());
 
             panel.PlayerClicked += async summary =>
             {
