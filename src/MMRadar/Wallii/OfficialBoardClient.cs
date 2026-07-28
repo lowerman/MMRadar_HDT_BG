@@ -156,6 +156,12 @@ namespace MMRadar.Wallii
             try
             {
                 text = await _http.GetStringAsync($"{_baseUrl}/{key}/").ConfigureAwait(false);
+                // A 200 is not proof of a board: ISP interception pages and edge
+                // error bodies arrive as 200 too. Shape-check BEFORE the response
+                // can overwrite the good offline copy or bypass the mirror
+                // fallback (throwing lands in the same catch as a dead endpoint).
+                if (string.IsNullOrWhiteSpace(text) || !text.Contains("<br />"))
+                    throw new FormatException("primary endpoint returned a non-board response");
                 SaveOfflineCopy(key, text);
             }
             catch (Exception ex)

@@ -119,6 +119,11 @@ namespace MMRadar.Wallii
                                 "update WalliiAnonKey in the plugin settings file.");
                         response.EnsureSuccessStatusCode();
                         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        // PostgREST never answers a valid query with an empty body
+                        // ("no rows" is "[]") — an empty 200 is a degraded edge and
+                        // must fail here, not get cached as "player not tracked".
+                        if (string.IsNullOrWhiteSpace(json))
+                            throw new WalliiApiException($"wallii API returned an empty body: {url}", null);
                         return JsonConvert.DeserializeObject<T>(json);
                     }
                 }
