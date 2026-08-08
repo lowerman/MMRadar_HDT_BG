@@ -212,11 +212,11 @@ namespace MMRadar.UI
             // so they carry over from the rows being replaced. Matching mirrors
             // UpdateLiveState: by game player id when known, by name only while
             // it is unambiguous (namesakes without ids wait for the next refresh).
-            HashSet<int> deadIds = null;
+            Dictionary<int, string> deadIds = null;
             HashSet<string> deadNames = null;
             if (_rows != null && _rows.Any(r => r.IsDead))
             {
-                deadIds = new HashSet<int>();
+                deadIds = new Dictionary<int, string>();
                 deadNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var nameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 foreach (var r in _rows)
@@ -230,9 +230,9 @@ namespace MMRadar.UI
                     if (!r.IsDead)
                         continue;
                     var id = r.Summary?.GamePlayerId ?? 0;
-                    if (id > 0)
-                        deadIds.Add(id);
                     var n = r.Summary?.LobbyName ?? r.Name;
+                    if (id > 0)
+                        deadIds[id] = n;
                     if (nameCounts[n] == 1)
                         deadNames.Add(n);
                 }
@@ -277,11 +277,25 @@ namespace MMRadar.UI
             }
             if (deadIds != null)
             {
+                // Same agreement rules as UpdateLiveState: an id match must also
+                // agree on the name (duos id spaces can collide), and the name
+                // fallback speaks only while the name is unambiguous in BOTH
+                // rosters — a freshly-surfaced namesake must not inherit a skull.
+                var newNameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in _rows)
+                {
+                    var n = row.Summary?.LobbyName ?? row.Name;
+                    newNameCounts.TryGetValue(n, out var c);
+                    newNameCounts[n] = c + 1;
+                }
                 foreach (var row in _rows)
                 {
                     var id = row.Summary?.GamePlayerId ?? 0;
                     var n = row.Summary?.LobbyName ?? row.Name;
-                    if ((id > 0 && deadIds.Contains(id)) || deadNames.Contains(n))
+                    var dead = (id > 0 && deadIds.TryGetValue(id, out var deadName) &&
+                                string.Equals(deadName, n, StringComparison.OrdinalIgnoreCase)) ||
+                               (deadNames.Contains(n) && newNameCounts[n] == 1);
+                    if (dead)
                         row.IsDead = true;
                 }
             }

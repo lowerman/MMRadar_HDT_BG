@@ -185,7 +185,8 @@ namespace MMRadar.Game
             // populating the list. A private (friendly) lobby legitimately runs
             // with 2-7 players and never reaches 8 — accept it; the partial-roster
             // loop upgrades the panel if more players do surface.
-            var minPlayers = IsFriendlyGame ? 2 : 8;
+            var friendly = IsFriendlyGame;
+            var minPlayers = friendly ? 2 : 8;
             if (lobbyPlayers == null || lobbyPlayers.Count < minPlayers)
                 return null;
 
@@ -196,8 +197,13 @@ namespace MMRadar.Game
             // trust the cached roster once the current Power.log confirms its names.
             if (lobbyInfo.GameUuid != null && lobbyInfo.GameUuid == _consumedGameUuid)
             {
-                if (lobbyInfo.GameUuid == _lastLobbyUuid && _lastLobbyPlayers != null &&
-                    (PowerLogConfirmsCachedRoster() || EntitiesConfirmCachedRoster()))
+                // Friendly groups rematch with the SAME names game after game, so
+                // a name overlap proves nothing there — only the hero entities
+                // (new every game) can confirm a friendly reconnect.
+                var confirmed = IsFriendlyGame
+                    ? EntitiesConfirmCachedRoster()
+                    : PowerLogConfirmsCachedRoster() || EntitiesConfirmCachedRoster();
+                if (lobbyInfo.GameUuid == _lastLobbyUuid && _lastLobbyPlayers != null && confirmed)
                 {
                     gameUuid = _lastLobbyUuid;
                     return _lastLobbyPlayers.Select(CopyPlayer).ToList();
@@ -238,7 +244,15 @@ namespace MMRadar.Game
             }
             if (result.Count == 0)
                 return null;
-            _consumedGameUuid = lobbyInfo.GameUuid;
+            // A friendly roster below 8 may still be HDT's watcher mid-publish:
+            // leave the uuid UNCONSUMED so every poll re-reads the LIVE list and
+            // late entries keep flowing into the partial-roster upgrade loop.
+            // Consuming here would latch the first partial snapshot for the whole
+            // game — the consumed-uuid branch above only ever replays the cache.
+            // Matchmade lobbies keep consume-on-accept: they are accepted only
+            // complete, and the next game must not reuse them.
+            if (!friendly || result.Count >= 8)
+                _consumedGameUuid = lobbyInfo.GameUuid;
             _lastLobbyUuid = lobbyInfo.GameUuid;
             _lastLobbyPlayers = result.Select(CopyPlayer).ToList();
             gameUuid = lobbyInfo.GameUuid;
