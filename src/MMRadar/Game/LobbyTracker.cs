@@ -91,6 +91,28 @@ namespace MMRadar.Game
         }
 
         /// <summary>
+        /// True for private (friendly) Battlegrounds lobbies, which legitimately
+        /// run with 2-7 players — the 8-slot expectations must not apply there.
+        /// </summary>
+        private static bool IsFriendlyGame
+        {
+            get
+            {
+                try
+                {
+                    var t = HdtCore.Game.CurrentGameType;
+                    return t == GameType.GT_BATTLEGROUNDS_FRIENDLY ||
+                           t == GameType.GT_BATTLEGROUNDS_DUO_FRIENDLY;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug("IsFriendlyGame: " + ex.Message);
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
         /// Marks whatever BattlegroundsLobbyInfo HDT currently holds as belonging to a
         /// finished game. HDT never clears GameMetaData between matches, so at the start
         /// of the next game the watcher may still serve the previous lobby.
@@ -159,7 +181,12 @@ namespace MMRadar.Game
             gameUuid = null;
             var lobbyInfo = HdtCore.Game.MetaData?.BattlegroundsLobbyInfo;
             var lobbyPlayers = lobbyInfo?.Players;
-            if (lobbyPlayers == null || lobbyPlayers.Count < 8)
+            // Fewer than 8 entries in a MATCHMADE lobby means HDT is still
+            // populating the list. A private (friendly) lobby legitimately runs
+            // with 2-7 players and never reaches 8 — accept it; the partial-roster
+            // loop upgrades the panel if more players do surface.
+            var minPlayers = IsFriendlyGame ? 2 : 8;
+            if (lobbyPlayers == null || lobbyPlayers.Count < minPlayers)
                 return null;
 
             // Guard against HDT's watcher still serving the previous game's lobby —
@@ -307,9 +334,12 @@ namespace MMRadar.Game
 
             // All 8 lobby names are printed at game creation; accept a partial lobby
             // only later in the game so we do not show an incomplete list at turn 1.
+            // A private (friendly) lobby never reaches 8 — take what the creation
+            // burst printed right away; the partial-roster loop upgrades it.
             var haveAll = _namesByPlayerId.Count >= 8;
+            var friendlyEnough = IsFriendlyGame && _namesByPlayerId.Count >= 2;
             var lateEnough = SafeTurnNumber() >= 3 && _namesByPlayerId.Count >= 2;
-            if (!haveAll && !lateEnough)
+            if (!haveAll && !friendlyEnough && !lateEnough)
                 return null;
 
             return _namesByPlayerId
