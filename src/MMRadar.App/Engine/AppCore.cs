@@ -106,6 +106,7 @@ namespace MMRadar.Standalone
         // Card position when a header press began — tells a drag from a click.
         private System.Windows.Point? _popupDragFrom;
         private Button _popupHomeButton;
+        private System.Windows.Media.ScaleTransform _homeIconFlip;
         private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
         private bool _spectateNoticeShown;
         private System.Windows.Threading.DispatcherTimer _saveDebounce;
@@ -156,6 +157,7 @@ namespace MMRadar.Standalone
 
             _panel.PlayerClicked += OnPlayerClicked;
             _panel.LayoutChanged += SaveLayout;
+            _panel.LayoutChanged += UpdateHomeIconDirection; // the panel moved: re-aim the dock arrow
             _panel.SettingsRequested += ToggleSettingsCard;
             _panel.ScaleChangedByUser += () =>
             {
@@ -828,6 +830,7 @@ namespace MMRadar.Standalone
             _popup.PanelScale = _panel.PanelScale;
             if (!TryPlacePopupAtSavedPosition())
                 PositionCardNextToPanel(_popup, 280);
+            UpdateHomeIconDirection();
         }
 
         /// <summary>
@@ -884,34 +887,53 @@ namespace MMRadar.Standalone
         }
 
         /// <summary>
-        /// A vector circular arrow drawn to match the ✕ glyph beside it (same
-        /// optical size and ~1px weight) — a symbol-font "↺" rendered small and
-        /// off the baseline. Its colour follows the button, hover included.
+        /// "Dock back to the panel": an arrow running into a bar, drawn as
+        /// vectors to match the ✕ glyph beside it (same optical size, ~1px
+        /// weight). A circular arrow read as "refresh". Points left by default;
+        /// <see cref="UpdateHomeIconDirection"/> mirrors it so it always points
+        /// at the panel. Its colour follows the button, hover included.
         /// </summary>
-        private static System.Windows.UIElement BuildHomeIcon()
+        private System.Windows.UIElement BuildHomeIcon()
         {
             var fg = new System.Windows.Data.Binding("Foreground")
             {
                 RelativeSource = new System.Windows.Data.RelativeSource(
                     System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Button), 1),
             };
-            var arc = new System.Windows.Shapes.Path
+            var shape = new System.Windows.Shapes.Path
             {
-                Data = System.Windows.Media.Geometry.Parse("M 8.3,5.3 A 3.3,3.3 0 1 1 6.13,2.2"),
+                Data = System.Windows.Media.Geometry.Parse(
+                    "M 1.5,1.5 L 1.5,8.5 M 8.5,5 L 3.3,5 M 5.6,2.7 L 3.3,5 L 5.6,7.3"),
                 StrokeThickness = 1.0,
                 StrokeStartLineCap = System.Windows.Media.PenLineCap.Round,
                 StrokeEndLineCap = System.Windows.Media.PenLineCap.Round,
+                StrokeLineJoin = System.Windows.Media.PenLineJoin.Round,
             };
-            arc.SetBinding(System.Windows.Shapes.Shape.StrokeProperty, fg);
-            var head = new System.Windows.Shapes.Path
+            shape.SetBinding(System.Windows.Shapes.Shape.StrokeProperty, fg);
+            _homeIconFlip = new System.Windows.Media.ScaleTransform(1, 1, 5, 5);
+            var icon = new Canvas
             {
-                Data = System.Windows.Media.Geometry.Parse("M 7.63,2.75 L 5.75,3.23 L 6.51,1.17 Z"),
+                Width = 10,
+                Height = 10,
+                IsHitTestVisible = false,
+                RenderTransform = _homeIconFlip,
             };
-            head.SetBinding(System.Windows.Shapes.Shape.FillProperty, fg);
-            var icon = new Canvas { Width = 10, Height = 10, IsHitTestVisible = false };
-            icon.Children.Add(arc);
-            icon.Children.Add(head);
+            icon.Children.Add(shape);
             return icon;
+        }
+
+        /// <summary>Mirrors the dock arrow so it points toward the panel.</summary>
+        private void UpdateHomeIconDirection()
+        {
+            if (_homeIconFlip == null)
+                return;
+            var panelLeft = Canvas.GetLeft(_panel);
+            var cardLeft = Canvas.GetLeft(_popup);
+            if (double.IsNaN(panelLeft) || double.IsNaN(cardLeft))
+                return;
+            var panelCenter = panelLeft + _panel.ActualWidth / 2;
+            var cardCenter = cardLeft + _popup.ActualWidth / 2;
+            _homeIconFlip.ScaleX = panelCenter > cardCenter ? -1 : 1;
         }
 
         private void UpdatePopupHomeButton()
@@ -921,6 +943,7 @@ namespace MMRadar.Standalone
             _popupHomeButton.Visibility = _appSettings.PopupLeftFraction != null
                 ? System.Windows.Visibility.Visible
                 : System.Windows.Visibility.Collapsed;
+            UpdateHomeIconDirection();
         }
 
         private void ResetPopupPosition()
