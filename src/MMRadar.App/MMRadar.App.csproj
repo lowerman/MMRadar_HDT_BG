@@ -38,6 +38,13 @@
     <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="all" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <!-- The app's own windows. -->
+  <ItemGroup>
+    <Page Include="UI\*.xaml" Generator="MSBuild:Compile" SubType="Designer" />
   </ItemGroup>
 
   <!-- Shared, HDT-free plugin code: one source of truth for the UI and data layers. -->

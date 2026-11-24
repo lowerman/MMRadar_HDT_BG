@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -23,39 +24,75 @@ namespace MMRadar.Standalone
     {
         private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string RunValue = "MMRadar";
+        private const string MutexName = "MMRadar.Standalone.SingleInstance";
+        private const string ShowEventName = "MMRadar.Standalone.ShowWindow";
 
         private static Mutex _singleInstance;
+        private static EventWaitHandle _showEvent;
         private static Application _app;
         private static AppCore _core;
         private static HearthstoneReader _reader;
         private static GameTracker _tracker;
         private static OverlayHost _overlay;
+        private static AppWindow _window;
         private static Forms.NotifyIcon _tray;
         private static Forms.ToolStripMenuItem _enabledItem;
         private static bool _lastConnected;
         private static readonly object LogLock = new object();
         private static string _logPath;
 
-        public static string Version =>
-            Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+        private static UpdateInfo _pendingUpdate;
+        private static bool _updating;
+        private static bool _justUpdated;
+        private static string _installZip;
+
+        public static string Version => UpdateService.CurrentVersion.ToString(3);
 
         [STAThread]
         public static int Main(string[] args)
         {
-            _singleInstance = new Mutex(true, "MMRadar.Standalone.SingleInstance", out var first);
-            if (!first)
+            args = args ?? new string[0];
+            _justUpdated = HasArg(args, "--updated");
+
+            // One instance per user. A second launch brings the running one's
+            // window up instead of complaining; right after an update the new
+            // build waits for the old one to finish exiting.
+            _singleInstance = new Mutex(false, MutexName);
+            bool owned;
+            try
             {
-                Forms.MessageBox.Show("MMRadar is already running — look for its icon in the system tray.",
-                    "MMRadar", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                owned = _singleInstance.WaitOne(_justUpdated ? TimeSpan.FromSeconds(20) : TimeSpan.Zero);
+            }
+            catch (AbandonedMutexException)
+            {
+                owned = true; // the previous instance died without cleaning up
+            }
+            if (!owned)
+            {
+                try
+                {
+                    using (var show = EventWaitHandle.OpenExisting(ShowEventName))
+                        show.Set();
+                }
+                catch
+                {
+                    Forms.MessageBox.Show("MMRadar is already running — look for its icon in the system tray.",
+                        "MMRadar", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                }
                 return 0;
             }
 
             SetUpLogging();
-            Logger.Info($"MMRadar {Version} starting");
-            AppCore.SimulateWalliiDown = Array.Exists(args ?? new string[0],
-                a => string.Equals(a, "--simulate-wallii-down", StringComparison.OrdinalIgnoreCase));
+            Logger.Info($"MMRadar {Version} starting" + (_justUpdated ? " (just updated)" : ""));
+            UpdateService.CleanupOldFiles();
+
+            AppCore.SimulateWalliiDown = HasArg(args, "--simulate-wallii-down");
             if (AppCore.SimulateWalliiDown)
                 Logger.Info("TEST MODE: wallii outage simulation is ON (--simulate-wallii-down)");
+            // Developer aid: install a local release zip through the real update path.
+            var zipIndex = Array.FindIndex(args, a => string.Equals(a, "--install-zip", StringComparison.OrdinalIgnoreCase));
+            if (zipIndex >= 0 && zipIndex + 1 < args.Length)
+                _installZip = args[zipIndex + 1];
 
             _app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             _app.DispatcherUnhandledException += (s, e) =>
@@ -69,6 +106,9 @@ namespace MMRadar.Standalone
             _app.Startup += (s, e) => Start();
             return _app.Run();
         }
+
+        private static bool HasArg(string[] args, string name) =>
+            Array.Exists(args, a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
 
         private static void Start()
         {
@@ -87,17 +127,133 @@ namespace MMRadar.Standalone
             {
                 _core.Tick();
                 UpdateTrayStatus();
+                if (_window != null && _window.IsVisible)
+                    RefreshWindowStatus();
             };
             tick.Start();
 
             BuildTray();
+            ListenForShowRequests();
+
+            if (!_core.AppSettings.WelcomeShown)
+            {
+                ShowWindow();
+                _window.ShowWelcome();
+                _core.AppSettings.WelcomeShown = true;
+                _core.AppSettings.Save();
+            }
+            else if (_justUpdated)
+            {
+                _tray.ShowBalloonTip(4000, $"MMRadar updated to {Version}",
+                    "Everything is ready — your settings were kept.", Forms.ToolTipIcon.Info);
+            }
+            else
+            {
+                _tray.ShowBalloonTip(4000,
+                    AppCore.SimulateWalliiDown ? "MMRadar is running — wallii outage simulation" : "MMRadar is running",
+                    "The panel appears automatically in Battlegrounds. Click here for options.",
+                    Forms.ToolTipIcon.Info);
+            }
+
+            if (_installZip != null)
+                _app.Dispatcher.BeginInvoke(new Action(InstallLocalZip), DispatcherPriority.ApplicationIdle);
+
+            ScheduleUpdateChecks();
         }
+
+        // --- window ---
+
+        private static void ShowWindow()
+        {
+            if (_window == null)
+            {
+                _window = new AppWindow(_core, IsAutostartEnabled(), SetAutostart, OpenDataFolder);
+                try
+                {
+                    using (var icon = DrawIcon())
+                        _window.Icon = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle,
+                            Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug("Window icon: " + ex.Message);
+                }
+                _window.UpdateRequested += () => _ = ApplyUpdateAsync();
+                _window.CheckRequested += () => _ = CheckForUpdatesAsync(manual: true);
+                _window.WhatsNewRequested += () =>
+                    UpdateService.OpenInBrowser(_pendingUpdate?.PageUrl ?? UpdateService.ReleasesPage);
+            }
+            if (_pendingUpdate != null && !_updating)
+                _window.ShowUpdate(_pendingUpdate, UpdateService.CanUpdateInPlace());
+            RefreshWindowStatus();
+            _window.Show();
+            if (_window.WindowState == WindowState.Minimized)
+                _window.WindowState = WindowState.Normal;
+            _window.Activate();
+        }
+
+        private static void RefreshWindowStatus()
+        {
+            var snap = _reader.Latest;
+            string title, detail;
+            var ok = snap.Connected;
+            if (!snap.Connected)
+            {
+                title = "Waiting for Hearthstone";
+                detail = "Start the game — MMRadar connects to it on its own.";
+            }
+            else if (_tracker.InBattlegroundsMatch)
+            {
+                title = "In a Battlegrounds match";
+                detail = (snap.Region != null ? snap.Region + " ladder" : "Region not known yet") +
+                         (_core.OverlayEnabled ? "" : " · overlay is turned off");
+            }
+            else
+            {
+                title = "Connected to Hearthstone";
+                detail = _core.OverlayEnabled
+                    ? "The panel appears when a Battlegrounds match starts."
+                    : "The overlay is turned off — enable it in the tray menu.";
+            }
+            if (AppCore.SimulateWalliiDown)
+                detail += "\nTest mode: wallii outage simulation is on.";
+            _window.SetStatus(title, detail, ok);
+        }
+
+        /// <summary>A second launch signals this event instead of starting twice.</summary>
+        private static void ListenForShowRequests()
+        {
+            _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
+            var listener = new Thread(() =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        _showEvent.WaitOne();
+                        _app.Dispatcher.BeginInvoke(new Action(ShowWindow));
+                    }
+                    catch
+                    {
+                        return; // disposed on exit
+                    }
+                }
+            })
+            { IsBackground = true, Name = "MMRadar.ShowListener" };
+            listener.Start();
+        }
+
+        // --- tray ---
 
         private static void BuildTray()
         {
             var menu = new Forms.ContextMenuStrip();
+            var open = new Forms.ToolStripMenuItem("Open MMRadar", null, (s, e) => ShowWindow())
+            {
+                Font = new Font(Forms.SystemInformation.MenuFont, System.Drawing.FontStyle.Bold),
+            };
+            menu.Items.Add(open);
             menu.Items.Add("Show / hide panel", null, (s, e) => _core.ToggleOverlay());
-            menu.Items.Add("Settings…", null, (s, e) => _core.OpenSettings());
             _enabledItem = new Forms.ToolStripMenuItem("Overlay enabled")
             {
                 Checked = _core.OverlayEnabled,
@@ -105,14 +261,6 @@ namespace MMRadar.Standalone
             };
             _enabledItem.CheckedChanged += (s, e) => _core.OverlayEnabled = _enabledItem.Checked;
             menu.Items.Add(_enabledItem);
-            var autostart = new Forms.ToolStripMenuItem("Start with Windows")
-            {
-                Checked = IsAutostartEnabled(),
-                CheckOnClick = true,
-            };
-            autostart.CheckedChanged += (s, e) => SetAutostart(autostart.Checked);
-            menu.Items.Add(autostart);
-            menu.Items.Add("Open data folder", null, (s, e) => OpenDataFolder());
             menu.Items.Add(new Forms.ToolStripSeparator());
             menu.Items.Add("Exit", null, (s, e) => Exit());
 
@@ -123,11 +271,12 @@ namespace MMRadar.Standalone
                 ContextMenuStrip = menu,
                 Visible = true,
             };
-            _tray.DoubleClick += (s, e) => _core.OpenSettings();
-            _tray.ShowBalloonTip(4000,
-                AppCore.SimulateWalliiDown ? "MMRadar is running — wallii outage simulation" : "MMRadar is running",
-                "The panel appears automatically in Battlegrounds. Right-click this icon for options.",
-                Forms.ToolTipIcon.Info);
+            _tray.MouseClick += (s, e) =>
+            {
+                if (e.Button == Forms.MouseButtons.Left)
+                    ShowWindow();
+            };
+            _tray.BalloonTipClicked += (s, e) => ShowWindow();
         }
 
         private static void UpdateTrayStatus()
@@ -144,7 +293,128 @@ namespace MMRadar.Standalone
             (connected ? $"MMRadar {Version} — connected to Hearthstone" : "MMRadar — waiting for Hearthstone") +
             (AppCore.SimulateWalliiDown ? " [wallii down sim]" : "");
 
+        // --- updates ---
+
+        private static void ScheduleUpdateChecks()
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Interval = TimeSpan.FromHours(6);
+                if (_core.AppSettings.AutoCheckUpdates)
+                    _ = CheckForUpdatesAsync(manual: false);
+            };
+            timer.Start();
+        }
+
+        private static async Task CheckForUpdatesAsync(bool manual)
+        {
+            UpdateInfo found;
+            try
+            {
+                found = await UpdateService.CheckAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Update check failed: " + ex.Message);
+                if (manual)
+                    _window?.ShowCheckResult("Couldn't reach GitHub — check your connection and try again.");
+                return;
+            }
+
+            if (found == null)
+            {
+                if (manual)
+                    _window?.ShowCheckResult($"You're on the latest version ({Version}).");
+                return;
+            }
+
+            Logger.Info($"Update available: {found.Version.ToString(3)}");
+            _pendingUpdate = found;
+            if (manual)
+                _window?.ShowCheckResult("");
+            if (_window != null && !_updating)
+                _window.ShowUpdate(found, UpdateService.CanUpdateInPlace());
+
+            // Announce each new version once; the window keeps showing it.
+            var v = found.Version.ToString(3);
+            if (!manual && _core.AppSettings.LastAnnouncedVersion != v)
+            {
+                _core.AppSettings.LastAnnouncedVersion = v;
+                _core.AppSettings.Save();
+                _tray.ShowBalloonTip(6000, $"MMRadar {v} is available",
+                    "Click here to update — it takes a few seconds.", Forms.ToolTipIcon.Info);
+            }
+        }
+
+        private static async Task ApplyUpdateAsync()
+        {
+            var update = _pendingUpdate;
+            if (update == null || _updating)
+                return;
+            if (!UpdateService.CanUpdateInPlace())
+            {
+                UpdateService.OpenInBrowser(update.PageUrl);
+                return;
+            }
+
+            _updating = true;
+            var progress = new Progress<string>(text => _window?.SetUpdateBusy(text));
+            try
+            {
+                var exe = await UpdateService.DownloadAndInstallAsync(update, progress).ConfigureAwait(true);
+                Restart(exe);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Update failed", ex);
+                _updating = false;
+                _window?.ShowUpdateError(
+                    "The update didn't go through — nothing was changed. " +
+                    "Try again, or download it from the release page (What's new).");
+            }
+        }
+
+        private static void InstallLocalZip()
+        {
+            try
+            {
+                Logger.Info("Installing local zip: " + _installZip);
+                var exe = UpdateService.InstallFromZip(_installZip);
+                Restart(exe);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Local zip install failed", ex);
+            }
+        }
+
+        /// <summary>Hands over to the freshly installed build.</summary>
+        private static void Restart(string exe)
+        {
+            Logger.Info("Restarting into the updated build");
+            Shutdown();
+            try
+            {
+                Process.Start(new ProcessStartInfo(exe, "--updated") { UseShellExecute = false });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Restart failed — start MMRadar manually", ex);
+            }
+            _app.Shutdown();
+        }
+
+        // --- shutdown ---
+
         private static void Exit()
+        {
+            Shutdown();
+            Logger.Info("MMRadar exited");
+            _app.Shutdown();
+        }
+
+        private static void Shutdown()
         {
             try
             {
@@ -154,15 +424,24 @@ namespace MMRadar.Standalone
                 {
                     _tray.Visible = false;
                     _tray.Dispose();
+                    _tray = null;
                 }
+                _window?.CloseForExit();
                 _overlay?.Close();
             }
             catch (Exception ex)
             {
                 Logger.Error("Shutdown failed", ex);
             }
-            Logger.Info("MMRadar exited");
-            _app.Shutdown();
+            try
+            {
+                // Release before a restart so the new build can take over at once.
+                _singleInstance?.ReleaseMutex();
+            }
+            catch
+            {
+                // not owned (already released)
+            }
         }
 
         // --- autostart (per-user, no elevation) ---

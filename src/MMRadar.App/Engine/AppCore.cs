@@ -110,6 +110,13 @@ namespace MMRadar.Standalone
         private int _previewGeneration;
         private SettingsWindow _settingsWindow;
         private AppSettings _appSettings;
+
+        /// <summary>App-only settings, shared with the app window and the updater.</summary>
+        public AppSettings AppSettings => _appSettings;
+
+        public string Theme => _settings.Theme;
+        public bool SortAscending => _settings.SortAscending;
+        public string ChipStyle => _settings.ChipStyle;
         // Which player the details card currently belongs to (toggle on re-click).
         private string _popupKey;
         // Card position when a header press began — tells a drag from a click.

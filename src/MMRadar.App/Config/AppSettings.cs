@@ -20,6 +20,15 @@ namespace MMRadar.Standalone
         public double? PopupLeftFraction { get; set; }
         public double? PopupTopFraction { get; set; }
 
+        /// <summary>False until the welcome window has been shown once.</summary>
+        public bool WelcomeShown { get; set; }
+
+        /// <summary>Look for a newer release on GitHub at start and every few hours.</summary>
+        public bool AutoCheckUpdates { get; set; } = true;
+
+        /// <summary>The newest version the tray balloon already announced (no nagging).</summary>
+        public string LastAnnouncedVersion { get; set; }
+
         [XmlIgnore]
         public string FilePath { get; private set; }
 
