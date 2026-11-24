@@ -141,12 +141,7 @@ namespace MMRadar.Hs
             };
             if (scene != GameSnapshot.SceneGameplay)
             {
-                // Logged in (hub and beyond): learn who the user is, so the app
-                // window can show their own stats between matches.
-                if (scene >= SceneHub)
-                    EnsureIdentity();
                 snap.Region = _region;
-                snap.LocalBattleTag = _battleTag;
                 return snap;
             }
 
@@ -255,8 +250,6 @@ namespace MMRadar.Hs
         }
 
         // --- readers ---
-
-        private const int SceneHub = 3;
 
         /// <summary>Region and battletag are fixed per session but may read as
         /// empty early on — retried until known, then kept until disconnect.</summary>

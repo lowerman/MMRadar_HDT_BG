@@ -130,7 +130,6 @@ namespace MMRadar.Standalone
             {
                 _core.Tick();
                 UpdateTrayStatus();
-                TrackIdentityAndMatches();
                 if (_window != null && _window.IsVisible)
                     RefreshWindowStatus();
             };
@@ -181,7 +180,7 @@ namespace MMRadar.Standalone
         {
             if (_window == null)
             {
-                _window = new AppWindow(_core, IsAutostartEnabled(), SetAutostart, OpenDataFolder, Identity);
+                _window = new AppWindow(_core, IsAutostartEnabled(), SetAutostart, OpenDataFolder);
                 try
                 {
                     using (var icon = DrawIcon())
@@ -200,46 +199,10 @@ namespace MMRadar.Standalone
             if (_pendingUpdate != null && !_updating)
                 _window.ShowUpdate(_pendingUpdate, UpdateService.CanUpdateInPlace());
             RefreshWindowStatus();
-            var wasVisible = _window.IsVisible;
             _window.Show();
             if (_window.WindowState == WindowState.Minimized)
                 _window.WindowState = WindowState.Normal;
             _window.Activate();
-            if (!wasVisible)
-                _window.RefreshProfile();
-        }
-
-        /// <summary>The user's account: live from the game, else as last seen.</summary>
-        private static (string BattleTag, string Region) Identity()
-        {
-            var snap = _reader.Latest;
-            if (snap.Connected && snap.LocalBattleTag != null && snap.Region != null)
-                return (snap.LocalBattleTag, snap.Region);
-            return (_core.AppSettings.LastBattleTag, _core.AppSettings.LastRegion);
-        }
-
-        private static bool _wasInMatch;
-
-        /// <summary>Remembers the account once the game reveals it, and keeps the
-        /// Home tab's stats current (new account, or a match just ended).</summary>
-        private static void TrackIdentityAndMatches()
-        {
-            var snap = _reader.Latest;
-            var settings = _core.AppSettings;
-            if (snap.Connected && snap.LocalBattleTag != null && snap.Region != null &&
-                (snap.LocalBattleTag != settings.LastBattleTag || snap.Region != settings.LastRegion))
-            {
-                settings.LastBattleTag = snap.LocalBattleTag;
-                settings.LastRegion = snap.Region;
-                settings.Save();
-                if (_window != null && _window.IsVisible)
-                    _window.RefreshProfile();
-            }
-
-            var inMatch = _tracker.InBattlegroundsMatch;
-            if (_wasInMatch && !inMatch && _window != null && _window.IsVisible)
-                _window.RefreshProfile(); // the finished game shows up in your stats
-            _wasInMatch = inMatch;
         }
 
         private static void RefreshWindowStatus()
