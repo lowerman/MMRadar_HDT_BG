@@ -97,90 +97,119 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Tab switch -->
+        <Style x:Key="TabButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="7" Padding="0,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-
-    <!-- Two columns keep the window compact: the app itself on the left,
-         the panel's look on the right. -->
-    <Grid Margin="18,14,18,16">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="260"/>
-        </Grid.ColumnDefinitions>
-
-        <!-- LEFT: status, first-run welcome, updates, app options -->
-        <StackPanel Grid.Column="0">
-            <Border Background="{StaticResource CardFill}" CornerRadius="8" Padding="11,8" Margin="0,0,0,10">
-                <DockPanel>
-                    <Ellipse x:Name="StatusDot" Width="7" Height="7" DockPanel.Dock="Left"
-                             VerticalAlignment="Top" Margin="0,5,9,0" Fill="#FF8B949E"/>
-                    <StackPanel>
-                        <TextBlock x:Name="StatusTitle" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="StatusDetail" FontSize="11" Foreground="{StaticResource TextMuted}"
-                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </DockPanel>
-            </Border>
-
-            <!-- First run only -->
-            <Border x:Name="WelcomeCard" Background="{StaticResource CardFill}" CornerRadius="8"
-                    Padding="11,9" Margin="0,0,0,10" Visibility="Collapsed"
-                    BorderBrush="#40E6C377" BorderThickness="1">
-                <StackPanel>
-                    <TextBlock Text="You're all set" FontSize="12" FontWeight="SemiBold"
-                               Foreground="{StaticResource AccentGold}"/>
-                    <TextBlock FontSize="11.5" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" Margin="0,4,0,0"
-                               Text="The panel appears by itself in every Battlegrounds match."/>
-                    <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,5,0,0"
-                               Text="MMRadar lives in the system tray. If Windows hides the icon behind ^, drag it onto the taskbar."/>
-                </StackPanel>
-            </Border>
-
-            <!-- Update available -->
-            <Border x:Name="UpdateCard" Background="{StaticResource CardFill}" CornerRadius="8"
-                    Padding="11,9" Margin="0,0,0,10" Visibility="Collapsed"
-                    BorderBrush="#5934C286" BorderThickness="1">
-                <StackPanel>
-                    <TextBlock x:Name="UpdateTitle" FontSize="12" FontWeight="SemiBold" Foreground="#FF34C286"/>
-                    <TextBlock x:Name="UpdateDetail" FontSize="11" Foreground="{StaticResource TextMuted}"
-                               TextWrapping="Wrap" Margin="0,3,0,8"/>
+    <StackPanel Margin="18,14,18,16" Width="260">
+        <!-- Two tabs instead of one long page -->
+        <Border Background="{StaticResource CardFill}" CornerRadius="9" Padding="3">
+            <UniformGrid Columns="2">
+                <Button x:Name="TabGeneral" Style="{StaticResource TabButton}" Click="TabGeneral_Click">
                     <StackPanel Orientation="Horizontal">
-                        <Button x:Name="UpdateButton" Style="{StaticResource PrimaryButton}" Content="Update now"
-                                Click="UpdateButton_Click"/>
-                        <Button Style="{StaticResource LinkButton}" Content="What's new" Margin="12,0,0,0"
-                                VerticalAlignment="Center" Click="WhatsNew_Click"/>
+                        <TextBlock Text="General"/>
+                        <Ellipse x:Name="UpdateDot" Width="6" Height="6" Fill="#FF34C286"
+                                 Margin="6,1,0,0" VerticalAlignment="Center" Visibility="Collapsed"
+                                 ToolTip="An update is available"/>
                     </StackPanel>
+                </Button>
+                <Button x:Name="TabPanel" Style="{StaticResource TabButton}" Click="TabPanel_Click" Content="Panel"/>
+            </UniformGrid>
+        </Border>
+
+        <!-- Both pages share one cell; the hidden one still reserves its size,
+             so the window keeps one height while switching tabs. -->
+        <Grid Margin="0,14,0,0">
+            <StackPanel x:Name="GeneralPage">
+                <Border Background="{StaticResource CardFill}" CornerRadius="8" Padding="11,8" Margin="0,0,0,10">
+                    <DockPanel>
+                        <Ellipse x:Name="StatusDot" Width="7" Height="7" DockPanel.Dock="Left"
+                                 VerticalAlignment="Top" Margin="0,5,9,0" Fill="#FF8B949E"/>
+                        <StackPanel>
+                            <TextBlock x:Name="StatusTitle" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="StatusDetail" FontSize="11" Foreground="{StaticResource TextMuted}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- First run only -->
+                <Border x:Name="WelcomeCard" Background="{StaticResource CardFill}" CornerRadius="8"
+                        Padding="11,9" Margin="0,0,0,10" Visibility="Collapsed"
+                        BorderBrush="#40E6C377" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="You're all set" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentGold}"/>
+                        <TextBlock FontSize="11.5" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="The panel appears by itself in every Battlegrounds match."/>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,5,0,0"
+                                   Text="MMRadar lives in the system tray. If Windows hides the icon behind ^, drag it onto the taskbar."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Update available -->
+                <Border x:Name="UpdateCard" Background="{StaticResource CardFill}" CornerRadius="8"
+                        Padding="11,9" Margin="0,0,0,10" Visibility="Collapsed"
+                        BorderBrush="#5934C286" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock x:Name="UpdateTitle" FontSize="12" FontWeight="SemiBold" Foreground="#FF34C286"/>
+                        <TextBlock x:Name="UpdateDetail" FontSize="11" Foreground="{StaticResource TextMuted}"
+                                   TextWrapping="Wrap" Margin="0,3,0,8"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="UpdateButton" Style="{StaticResource PrimaryButton}" Content="Update now"
+                                    Click="UpdateButton_Click"/>
+                            <Button Style="{StaticResource LinkButton}" Content="What's new" Margin="12,0,0,0"
+                                    VerticalAlignment="Center" Click="WhatsNew_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="APP" FontSize="9.5" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextMuted}" Margin="2,4,0,7"/>
+                <CheckBox x:Name="AutostartBox" Content="Start with Windows"
+                          Checked="AutostartBox_Changed" Unchecked="AutostartBox_Changed"/>
+                <CheckBox x:Name="AutoUpdateBox" Content="Check for updates automatically"
+                          Checked="AutoUpdateBox_Changed" Unchecked="AutoUpdateBox_Changed"/>
+
+                <StackPanel Orientation="Horizontal" Margin="2,6,0,0">
+                    <Button x:Name="CheckButton" Style="{StaticResource LinkButton}" Content="Check for updates"
+                            Click="CheckButton_Click"/>
+                    <TextBlock Text="  ·  " FontSize="11.5" Foreground="{StaticResource TextMuted}"/>
+                    <Button Style="{StaticResource LinkButton}" Content="GitHub" Click="GitHub_Click"/>
+                    <TextBlock Text="  ·  " FontSize="11.5" Foreground="{StaticResource TextMuted}"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Data folder" Click="DataFolder_Click"/>
                 </StackPanel>
-            </Border>
+                <TextBlock x:Name="CheckResult" FontSize="11" Foreground="{StaticResource TextMuted}"
+                           TextWrapping="Wrap" Margin="2,5,0,0" Visibility="Collapsed"/>
 
-            <TextBlock Text="APP" FontSize="9.5" FontWeight="SemiBold"
-                       Foreground="{StaticResource TextMuted}" Margin="2,4,0,7"/>
-            <CheckBox x:Name="AutostartBox" Content="Start with Windows"
-                      Checked="AutostartBox_Changed" Unchecked="AutostartBox_Changed"/>
-            <CheckBox x:Name="AutoUpdateBox" Content="Check for updates automatically"
-                      Checked="AutoUpdateBox_Changed" Unchecked="AutoUpdateBox_Changed"/>
-
-            <StackPanel Orientation="Horizontal" Margin="2,6,0,0">
-                <Button x:Name="CheckButton" Style="{StaticResource LinkButton}" Content="Check for updates"
-                        Click="CheckButton_Click"/>
-                <TextBlock Text="  ·  " FontSize="11.5" Foreground="{StaticResource TextMuted}"/>
-                <Button Style="{StaticResource LinkButton}" Content="GitHub" Click="GitHub_Click"/>
-                <TextBlock Text="  ·  " FontSize="11.5" Foreground="{StaticResource TextMuted}"/>
-                <Button Style="{StaticResource LinkButton}" Content="Data folder" Click="DataFolder_Click"/>
+                <TextBlock FontSize="10.5" Foreground="#FF7D848C" TextWrapping="Wrap" Margin="2,12,0,0"
+                           Text="Closing this window keeps MMRadar in the tray."/>
             </StackPanel>
-            <TextBlock x:Name="CheckResult" FontSize="11" Foreground="{StaticResource TextMuted}"
-                       TextWrapping="Wrap" Margin="2,5,0,0" Visibility="Collapsed"/>
 
-            <TextBlock FontSize="10.5" Foreground="#FF7D848C" TextWrapping="Wrap" Margin="2,12,0,0"
-                       Text="Closing this window keeps MMRadar in the tray."/>
-        </StackPanel>
-
-        <!-- column divider -->
-        <Border Grid.Column="1" Width="1" Background="{StaticResource Divider}" Margin="20,0"/>
-
-        <!-- RIGHT: the panel's look and position (shared with the plugin as-is) -->
-        <ui:SettingsContent x:Name="Settings" Grid.Column="2" VerticalAlignment="Top"/>
-    </Grid>
+            <!-- The panel's look and position (shared with the plugin as-is) -->
+            <ui:SettingsContent x:Name="Settings" VerticalAlignment="Top" Visibility="Hidden"/>
+        </Grid>
+    </StackPanel>
 </Window>

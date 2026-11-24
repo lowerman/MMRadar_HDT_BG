@@ -42,7 +42,43 @@ namespace MMRadar.Standalone
 
             AutostartBox.IsChecked = autostart;
             AutoUpdateBox.IsChecked = _core.AppSettings.AutoCheckUpdates;
+            SelectTab(panel: false);
             _initializing = false;
+        }
+
+        // --- tabs ---
+
+        private bool _panelTab;
+
+        private void TabGeneral_Click(object sender, RoutedEventArgs e) => SelectTab(panel: false);
+
+        private void TabPanel_Click(object sender, RoutedEventArgs e) => SelectTab(panel: true);
+
+        /// <summary>
+        /// Switches pages by visibility only: the inactive page stays Hidden (not
+        /// Collapsed) so it keeps reserving its size and the window never jumps.
+        /// </summary>
+        private void SelectTab(bool panel)
+        {
+            _panelTab = panel;
+            GeneralPage.Visibility = panel ? Visibility.Hidden : Visibility.Visible;
+            Settings.Visibility = panel ? Visibility.Visible : Visibility.Hidden;
+            StyleTab(TabGeneral, !panel);
+            StyleTab(TabPanel, panel);
+            UpdateDot.Visibility = panel && UpdateCard.Visibility == Visibility.Visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private static void StyleTab(Button tab, bool active)
+        {
+            tab.Background = active ? new SolidColorBrush(Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)) : Brushes.Transparent;
+            // Inactive: drop the local colour so the style's muted text and its
+            // hover highlight apply again (a local value would override both).
+            if (active)
+                tab.Foreground = new SolidColorBrush(Color.FromRgb(0xF2, 0xF4, 0xF6));
+            else
+                tab.ClearValue(ForegroundProperty);
         }
 
         /// <summary>Shows the welcome card (first run only).</summary>
@@ -69,6 +105,8 @@ namespace MMRadar.Standalone
                 : "MMRadar's folder is read-only, so the update has to be downloaded manually.";
             UpdateButton.Content = canInstallInPlace ? "Update now" : "Download";
             UpdateButton.IsEnabled = true;
+            if (_panelTab)
+                UpdateDot.Visibility = Visibility.Visible; // don't let it hide behind the other tab
         }
 
         public void SetUpdateBusy(string text)
