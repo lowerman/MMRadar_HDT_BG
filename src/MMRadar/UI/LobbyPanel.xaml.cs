@@ -97,6 +97,8 @@ namespace MMRadar.UI
             else
                 TitleDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
             TitleBlock.ToolTip = reason;
+            if (_lastSummaries != null)
+                UpdateLobbyContext(_lastSummaries); // header delta follows the state
         }
 
         private IReadOnlyList<PlayerSummary> _lastSummaries;
@@ -352,7 +354,10 @@ namespace MMRadar.UI
 
             var local = summaries.FirstOrDefault(s => s.IsLocalPlayer);
             var localRating = local != null ? RatingOf(local) : null;
-            if (localRating != null)
+            // Outage state: the rows lose the chip column and get narrow, so the
+            // header would set the card's width — the delta is dropped to keep it
+            // compact (the average stays).
+            if (localRating != null && _walliiDownReason == null)
             {
                 var delta = localRating.Value - avg;
                 HeaderContextText.Inlines.Add(new System.Windows.Documents.Run(" · "));
