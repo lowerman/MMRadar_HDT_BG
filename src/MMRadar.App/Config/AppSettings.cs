@@ -28,6 +28,7 @@ namespace MMRadar.Standalone
 
         /// <summary>The newest version the tray balloon already announced (no nagging).</summary>
         public string LastAnnouncedVersion { get; set; }
+
         [XmlIgnore]
         public string FilePath { get; private set; }
 

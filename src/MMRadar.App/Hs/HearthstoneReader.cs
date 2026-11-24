@@ -127,9 +127,9 @@ namespace MMRadar.Hs
             if (scene != _lastScene)
             {
                 // Scene change = game boundary: per-game facts must be re-read.
-                // (Account identity — battletag, region — survives until disconnect.)
                 _lastScene = scene;
                 _gameType = 0;
+                _battleTag = null;
                 _serviceSlotHints.Clear();
             }
 
@@ -151,7 +151,13 @@ namespace MMRadar.Hs
             if (!snap.IsBattlegrounds)
                 return snap;
 
-            EnsureIdentity();
+            // Region is fixed for the session but may read as 0 early on — retry
+            // until known, then keep it.
+            if (_region == null)
+                _region = MapRegion(SafeInt(() =>
+                    GetService("Network")?["m_state"]?["<CachedRegion>k__BackingField"]));
+            if (_battleTag == null)
+                _battleTag = ReadLocalBattleTag();
 
             snap.Region = _region;
             snap.LocalBattleTag = _battleTag;
@@ -250,17 +256,6 @@ namespace MMRadar.Hs
         }
 
         // --- readers ---
-
-        /// <summary>Region and battletag are fixed per session but may read as
-        /// empty early on — retried until known, then kept until disconnect.</summary>
-        private void EnsureIdentity()
-        {
-            if (_region == null)
-                _region = MapRegion(SafeInt(() =>
-                    GetService("Network")?["m_state"]?["<CachedRegion>k__BackingField"]));
-            if (_battleTag == null)
-                _battleTag = ReadLocalBattleTag();
-        }
 
         private int ReadScene() =>
             SafeInt(() => _image["SceneMgr"]?["s_instance"]?["m_mode"]);

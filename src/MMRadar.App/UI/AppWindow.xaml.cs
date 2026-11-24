@@ -7,14 +7,12 @@ using System.Windows.Media;
 namespace MMRadar.Standalone
 {
     /// <summary>
-    /// The app's single window: status, updates, the panel's look (one compact
-    /// row per setting) and app options. Closing it only hides it — MMRadar
-    /// keeps running in the tray.
+    /// The app's own window (everything that is not the overlay): live status,
+    /// first-run welcome, updates, the shared settings and app options. Closing
+    /// it only hides it — MMRadar keeps running in the tray.
     /// </summary>
     public partial class AppWindow : Window
     {
-        private static readonly Brush Selected = Freeze(new SolidColorBrush(Color.FromRgb(0xE6, 0xC3, 0x77)));
-
         private readonly AppCore _core;
         private readonly Action<bool> _setAutostart;
         private readonly Action _openDataFolder;
@@ -32,93 +30,32 @@ namespace MMRadar.Standalone
             _setAutostart = setAutostart;
             _openDataFolder = openDataFolder;
 
-            var version = UpdateService.CurrentVersion.ToString(3);
-            Title = "MMRadar";
-            VersionText.Text = "v" + version;
+            VersionText.Text = "v" + UpdateService.CurrentVersion.ToString(3);
+
+            Settings.PreviewClicked += () => _core.ToggleOverlay();
+            Settings.ResetClicked += () => _core.ResetPosition();
+            Settings.ThemeSelected += key => _core.SetTheme(key);
+            Settings.SortChanged += asc => _core.SetSortAscending(asc);
+            Settings.ChipStyleSelected += key => _core.SetChipStyle(key);
+            Settings.Sync(_core.Theme, _core.SortAscending, _core.ChipStyle);
+            AdaptSharedTexts(Settings); // its tree exists right after InitializeComponent
 
             AutostartBox.IsChecked = autostart;
             AutoUpdateBox.IsChecked = _core.AppSettings.AutoCheckUpdates;
-            SyncPanelChoices();
-            // The in-game gear card can change the same settings meanwhile.
-            Activated += (s, e) => SyncPanelChoices();
             _initializing = false;
         }
 
-        // --- status ---
-
+        /// <summary>Shows the welcome card (first run only).</summary>
         public void ShowWelcome() => WelcomeCard.Visibility = Visibility.Visible;
 
         public void SetStatus(string title, string detail, bool ok)
         {
             StatusTitle.Text = title;
-            StatusDetail.Text = string.IsNullOrEmpty(detail) ? "" : " · " + detail;
+            StatusDetail.Text = detail;
+            StatusDetail.Visibility = string.IsNullOrEmpty(detail) ? Visibility.Collapsed : Visibility.Visible;
             StatusDot.Fill = new SolidColorBrush(ok
                 ? Color.FromRgb(0x34, 0xC2, 0x86)
                 : Color.FromRgb(0x8B, 0x94, 0x9E));
-        }
-
-        // --- panel settings ---
-
-        private void ThemeDark_Click(object sender, RoutedEventArgs e) => SetTheme("dark");
-        private void ThemeNeutral_Click(object sender, RoutedEventArgs e) => SetTheme("hdt");
-        private void ThemeWarm_Click(object sender, RoutedEventArgs e) => SetTheme("hearthstone");
-
-        private void SetTheme(string key)
-        {
-            _core.SetTheme(key);
-            SyncPanelChoices();
-        }
-
-        private void SortDesc_Click(object sender, RoutedEventArgs e) => SetSort(false);
-        private void SortAsc_Click(object sender, RoutedEventArgs e) => SetSort(true);
-
-        private void SetSort(bool ascending)
-        {
-            _core.SetSortAscending(ascending);
-            SyncPanelChoices();
-        }
-
-        private void ChipsClassic_Click(object sender, RoutedEventArgs e) => SetChips("classic");
-        private void ChipsTint_Click(object sender, RoutedEventArgs e) => SetChips("tint");
-        private void ChipsText_Click(object sender, RoutedEventArgs e) => SetChips("bare");
-
-        private void SetChips(string key)
-        {
-            _core.SetChipStyle(key);
-            SyncPanelChoices();
-        }
-
-        private void Preview_Click(object sender, RoutedEventArgs e) => _core.ToggleOverlay();
-
-        private void Reset_Click(object sender, RoutedEventArgs e) => _core.ResetPosition();
-
-        /// <summary>Outlines the current choice of every panel setting.</summary>
-        private void SyncPanelChoices()
-        {
-            var theme = _core.Theme;
-            Mark(ThemeDark, theme == "dark");
-            Mark(ThemeNeutral, theme != "dark" && theme != "hearthstone");
-            Mark(ThemeWarm, theme == "hearthstone");
-            Mark(SortDesc, !_core.SortAscending);
-            Mark(SortAsc, _core.SortAscending);
-            var chips = _core.ChipStyle;
-            Mark(ChipsClassic, chips != "tint" && chips != "bare");
-            Mark(ChipsTint, chips == "tint");
-            Mark(ChipsText, chips == "bare");
-        }
-
-        private static void Mark(Button button, bool selected)
-        {
-            if (selected)
-                button.BorderBrush = Selected;
-            else
-                button.ClearValue(BorderBrushProperty);
-        }
-
-        private static Brush Freeze(Brush b)
-        {
-            b.Freeze();
-            return b;
         }
 
         // --- updates ---
@@ -176,6 +113,7 @@ namespace MMRadar.Standalone
 
         private void CheckButton_Click(object sender, RoutedEventArgs e)
         {
+            CheckButton.IsEnabled = false;
             ShowCheckResult("Checking…");
             CheckButton.IsEnabled = false;
             CheckRequested?.Invoke();
@@ -198,6 +136,32 @@ namespace MMRadar.Standalone
                 return;
             _core.AppSettings.AutoCheckUpdates = AutoUpdateBox.IsChecked == true;
             _core.AppSettings.Save();
+        }
+
+        /// <summary>
+        /// The settings block is shared with the HDT plugin and still speaks its
+        /// language in two spots; adjust them here so the shared file stays as is.
+        /// </summary>
+        private static void AdaptSharedTexts(DependencyObject root)
+        {
+            foreach (var child in LogicalTreeHelper.GetChildren(root))
+            {
+                if (child is TextBlock tb)
+                {
+                    if (tb.Text == "HDT")
+                    {
+                        tb.Text = "Neutral";
+                        if (tb.Parent is FrameworkElement p && p.Parent is Button b)
+                            b.ToolTip = "Neutral grey (default)";
+                    }
+                    else if (tb.Text != null && tb.Text.StartsWith("Drag the header to move the panel."))
+                    {
+                        tb.Text = "Drag the header to move the panel. The preview shows it even without the game.";
+                    }
+                }
+                if (child is DependencyObject d)
+                    AdaptSharedTexts(d);
+            }
         }
     }
 }

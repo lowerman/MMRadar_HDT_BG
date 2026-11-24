@@ -209,21 +209,28 @@ namespace MMRadar.Standalone
         {
             var snap = _reader.Latest;
             string title, detail;
+            var ok = snap.Connected;
             if (!snap.Connected)
             {
                 title = "Waiting for Hearthstone";
-                detail = "start the game";
+                detail = "Start the game — MMRadar connects to it on its own.";
+            }
+            else if (_tracker.InBattlegroundsMatch)
+            {
+                title = "In a Battlegrounds match";
+                detail = (snap.Region != null ? snap.Region + " ladder" : "Region not known yet") +
+                         (_core.OverlayEnabled ? "" : " · overlay is turned off");
             }
             else
             {
-                title = _tracker.InBattlegroundsMatch ? "In a Battlegrounds match" : "Connected";
-                detail = snap.Region ?? "";
-                if (!_core.OverlayEnabled)
-                    detail = (detail.Length > 0 ? detail + " · " : "") + "overlay off";
+                title = "Connected to Hearthstone";
+                detail = _core.OverlayEnabled
+                    ? "The panel appears when a Battlegrounds match starts."
+                    : "The overlay is turned off — enable it in the tray menu.";
             }
             if (AppCore.SimulateWalliiDown)
-                detail = (detail.Length > 0 ? detail + " · " : "") + "wallii sim";
-            _window.SetStatus(title, detail, snap.Connected);
+                detail += "\nTest mode: wallii outage simulation is on.";
+            _window.SetStatus(title, detail, ok);
         }
 
         /// <summary>A second launch signals this event instead of starting twice.</summary>
