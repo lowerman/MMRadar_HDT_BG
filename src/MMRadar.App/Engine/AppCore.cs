@@ -809,10 +809,18 @@ namespace MMRadar.Standalone
                 HidePanel();
         }
 
+        /// <summary>Raised (on the UI thread) whenever the panel appears or disappears.</summary>
+        public event Action<bool> PanelShownChanged;
+
+        public bool IsPanelShown => _panel != null && _panel.Visibility == System.Windows.Visibility.Visible;
+
         private void ShowPanel()
         {
             ApplyAutoScale();
+            var was = IsPanelShown;
             _panel.Visibility = System.Windows.Visibility.Visible;
+            if (!was)
+                PanelShownChanged?.Invoke(true);
         }
 
         /// <summary>
@@ -860,7 +868,10 @@ namespace MMRadar.Standalone
         private void HidePanel()
         {
             _popupGeneration++; // cancel any in-flight details fetch re-showing the popup
+            var was = IsPanelShown;
             _panel.Visibility = System.Windows.Visibility.Collapsed;
+            if (was)
+                PanelShownChanged?.Invoke(false);
             _popup.Visibility = System.Windows.Visibility.Collapsed;
             HideSettingsCard();
         }

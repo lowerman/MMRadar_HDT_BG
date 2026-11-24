@@ -32,13 +32,14 @@ namespace MMRadar.Standalone
 
             VersionText.Text = "v" + UpdateService.CurrentVersion.ToString(3);
 
-            Settings.PreviewClicked += () => _core.ToggleOverlay();
+            Settings.PanelToggleClicked += () => _core.ToggleOverlay();
             Settings.ResetClicked += () => _core.ResetPosition();
             Settings.ThemeSelected += key => _core.SetTheme(key);
             Settings.SortChanged += asc => _core.SetSortAscending(asc);
             Settings.ChipStyleSelected += key => _core.SetChipStyle(key);
             Settings.Sync(_core.Theme, _core.SortAscending, _core.ChipStyle);
-            AdaptSharedTexts(Settings); // its tree exists right after InitializeComponent
+            Settings.SetPanelShown(_core.IsPanelShown);
+            _core.PanelShownChanged += Settings.SetPanelShown;
 
             AutostartBox.IsChecked = autostart;
             AutoUpdateBox.IsChecked = _core.AppSettings.AutoCheckUpdates;
@@ -136,32 +137,6 @@ namespace MMRadar.Standalone
                 return;
             _core.AppSettings.AutoCheckUpdates = AutoUpdateBox.IsChecked == true;
             _core.AppSettings.Save();
-        }
-
-        /// <summary>
-        /// The settings block is shared with the HDT plugin and still speaks its
-        /// language in two spots; adjust them here so the shared file stays as is.
-        /// </summary>
-        private static void AdaptSharedTexts(DependencyObject root)
-        {
-            foreach (var child in LogicalTreeHelper.GetChildren(root))
-            {
-                if (child is TextBlock tb)
-                {
-                    if (tb.Text == "HDT")
-                    {
-                        tb.Text = "Neutral";
-                        if (tb.Parent is FrameworkElement p && p.Parent is Button b)
-                            b.ToolTip = "Neutral grey (default)";
-                    }
-                    else if (tb.Text != null && tb.Text.StartsWith("Drag the header to move the panel."))
-                    {
-                        tb.Text = "Drag the header to move the panel. The preview shows it even without the game.";
-                    }
-                }
-                if (child is DependencyObject d)
-                    AdaptSharedTexts(d);
-            }
         }
     }
 }

@@ -1,7 +1,7 @@
 <Window x:Class="MMRadar.Standalone.AppWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:ui="clr-namespace:MMRadar.UI"
+        xmlns:local="clr-namespace:MMRadar.Standalone"
         Title="MMRadar"
         SizeToContent="WidthAndHeight"
         ResizeMode="CanMinimize"
@@ -100,13 +100,6 @@
     </Window.Resources>
 
     <StackPanel Margin="18,14,18,14" Width="260">
-        <!-- Title + version -->
-        <DockPanel Margin="0,0,0,10">
-            <TextBlock x:Name="VersionText" DockPanel.Dock="Right" VerticalAlignment="Bottom"
-                       FontSize="11" Foreground="{StaticResource TextMuted}"/>
-            <TextBlock Text="MMRADAR" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-        </DockPanel>
-
         <!-- Live status -->
         <Border Background="{StaticResource CardFill}" CornerRadius="8" Padding="11,8" Margin="0,0,0,10">
             <DockPanel>
@@ -154,13 +147,17 @@
 
         <Border Height="1" Background="{StaticResource Divider}" Margin="0,0,0,12"/>
 
-        <!-- The plugin's settings, shared as-is -->
-        <ui:SettingsContent x:Name="Settings"/>
+        <!-- Panel look and placement (the app's own copy of the plugin's settings) -->
+        <local:PanelSettings x:Name="Settings"/>
 
-        <Border Height="1" Background="{StaticResource Divider}" Margin="0,4,0,12"/>
+        <Border Height="1" Background="{StaticResource Divider}" Margin="0,12,0,12"/>
 
-        <TextBlock Text="APP" FontSize="9.5" FontWeight="SemiBold"
-                   Foreground="{StaticResource TextMuted}" Margin="2,0,0,7"/>
+        <DockPanel Margin="2,0,0,7">
+            <TextBlock x:Name="VersionText" DockPanel.Dock="Right" VerticalAlignment="Center"
+                       FontSize="10.5" Foreground="{StaticResource TextMuted}"/>
+            <TextBlock Text="APP" FontSize="9.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                       Foreground="{StaticResource TextMuted}"/>
+        </DockPanel>
         <CheckBox x:Name="AutostartBox" Content="Start with Windows"
                   Checked="AutostartBox_Changed" Unchecked="AutostartBox_Changed"/>
         <CheckBox x:Name="AutoUpdateBox" Content="Check for updates automatically"
