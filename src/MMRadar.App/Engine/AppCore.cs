@@ -867,8 +867,7 @@ namespace MMRadar.Standalone
                 _popupHomeButton = new Button
                 {
                     Style = _popup.CloseButton.Style,
-                    Content = "↺",
-                    FontFamily = new System.Windows.Media.FontFamily("Segoe UI Symbol, Segoe UI"),
+                    Content = BuildHomeIcon(),
                     VerticalAlignment = System.Windows.VerticalAlignment.Top,
                     Margin = new System.Windows.Thickness(0, 0, 2, 0),
                     ToolTip = "Move back next to the panel",
@@ -882,6 +881,37 @@ namespace MMRadar.Standalone
             {
                 Logger.Error("AddPopupHomeButton failed", ex);
             }
+        }
+
+        /// <summary>
+        /// A vector circular arrow drawn to match the ✕ glyph beside it (same
+        /// optical size and ~1px weight) — a symbol-font "↺" rendered small and
+        /// off the baseline. Its colour follows the button, hover included.
+        /// </summary>
+        private static System.Windows.UIElement BuildHomeIcon()
+        {
+            var fg = new System.Windows.Data.Binding("Foreground")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(
+                    System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Button), 1),
+            };
+            var arc = new System.Windows.Shapes.Path
+            {
+                Data = System.Windows.Media.Geometry.Parse("M 8.3,5.3 A 3.3,3.3 0 1 1 6.13,2.2"),
+                StrokeThickness = 1.0,
+                StrokeStartLineCap = System.Windows.Media.PenLineCap.Round,
+                StrokeEndLineCap = System.Windows.Media.PenLineCap.Round,
+            };
+            arc.SetBinding(System.Windows.Shapes.Shape.StrokeProperty, fg);
+            var head = new System.Windows.Shapes.Path
+            {
+                Data = System.Windows.Media.Geometry.Parse("M 7.63,2.75 L 5.75,3.23 L 6.51,1.17 Z"),
+            };
+            head.SetBinding(System.Windows.Shapes.Shape.FillProperty, fg);
+            var icon = new Canvas { Width = 10, Height = 10, IsHitTestVisible = false };
+            icon.Children.Add(arc);
+            icon.Children.Add(head);
+            return icon;
         }
 
         private void UpdatePopupHomeButton()
