@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    MMRadar standalone (1.1.x): the same overlay as the HDT plugin, without
+    Hearthstone Deck Tracker. Game state is read straight from the game's
+    memory via the vendored, MIT-licensed UnitySpy reader (vendor/UnitySpy).
+
+    Deliberately NOT part of MMRadar.sln: the plugin build stays untouched.
+    Build with tools/build-app.ps1.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>MMRadar</AssemblyName>
+    <RootNamespace>MMRadar</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Version>1.1.0</Version>
+    <Company>MMRadar</Company>
+    <Product>MMRadar</Product>
+    <Description>Battlegrounds lobby overlay: opponents' ratings and average placement</Description>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS0168;CS0219;CS0414;CS0649;CS1998;CS8632</NoWarn>
+    <!-- The shared plugin sources are linked in explicitly below. -->
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="all" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <!-- Shared, HDT-free plugin code: one source of truth for the UI and data layers. -->
+  <ItemGroup>
+    <Compile Include="..\MMRadar\UI\*.cs" Link="Shared\UI\%(Filename)%(Extension)" />
+    <Page Include="..\MMRadar\UI\*.xaml" Link="Shared\UI\%(Filename)%(Extension)" Generator="MSBuild:Compile" SubType="Designer" />
+    <Compile Include="..\MMRadar\Wallii\*.cs" Link="Shared\Wallii\%(Filename)%(Extension)" />
+    <Compile Include="..\MMRadar\Config\*.cs" Link="Shared\Config\%(Filename)%(Extension)" />
+    <Compile Include="..\MMRadar\Util\*.cs" Link="Shared\Util\%(Filename)%(Extension)" />
+    <Compile Include="..\MMRadar\Engine\SampleData.cs" Link="Shared\Engine\SampleData.cs" />
+    <Compile Include="..\MMRadar\Game\LobbyModels.cs" Link="Shared\Game\LobbyModels.cs" />
+  </ItemGroup>
+
+  <!-- Vendored UnitySpy core (MIT, see vendor/UnitySpy/NOTICE.md). -->
+  <ItemGroup>
+    <Compile Include="..\..\vendor\UnitySpy\**\*.cs" Link="Vendor\UnitySpy\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

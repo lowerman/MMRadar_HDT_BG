@@ -1,0 +1,849 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows.Controls;
+using MMRadar.Config;
+using MMRadar.Game;
+using MMRadar.UI;
+using MMRadar.Util;
+using MMRadar.Wallii;
+using MMRadar.Engine;
+using MMRadar.Hs;
+
+namespace MMRadar.Standalone
+{
+    /// <summary>
+    /// Standalone orchestrator: game state (read from the game itself), wallii fetches, overlay UI.
+    /// A deliberate copy of the plugin's PluginCore with the HDT touchpoints swapped for
+    /// </summary>
+    /// GameTracker (game memory) and OverlayHost (own transparent window) — the fetch,
+    /// two-phase render and retry logic is kept identical.
+    public class AppCore
+    {
+        private enum Phase
+        {
+            Idle,
+            WaitingForLobby,
+            Fetching,
+            Loaded,
+        }
+
+        private readonly GameTracker _tracker;
+        private readonly MMRadar.Overlay.OverlayHost _overlay;
+
+        public AppCore(GameTracker tracker, MMRadar.Overlay.OverlayHost overlay)
+        {
+            _tracker = tracker;
+            _overlay = overlay;
+        }
+
+        /// <summary>%AppData%\MMRadar — settings, offline board copies, logs.</summary>
+        public static string DataDirectory =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MMRadar");
+
+        /// <summary>
+        /// First run after the HDT plugin: adopt its settings (panel position,
+        /// theme, scale, colors) so the panel shows up exactly where it was.
+        /// </summary>
+        private static void ImportPluginSettings(string dir)
+        {
+            try
+            {
+                var target = Path.Combine(dir, "settings.xml");
+                if (File.Exists(target))
+                    return;
+                var plugin = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "HearthstoneDeckTracker", "MMRadar", "settings.xml");
+                if (!File.Exists(plugin))
+                    return;
+                Directory.CreateDirectory(dir);
+                File.Copy(plugin, target);
+                Logger.Info("Imported settings from the HDT plugin");
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Plugin settings import skipped: " + ex.Message);
+            }
+        }
+        private WalliiService _wallii;
+        private PluginSettings _settings;
+        private LobbyPanel _panel;
+        private PlayerDetailsPopup _popup;
+        private SettingsCard _settingsCard;
+
+        private Phase _phase = Phase.Idle;
+        private LobbyState _lobby;
+        private int _fetchGeneration;
+        private int _popupGeneration;
+        private DateTime _lastLiveRefresh = DateTime.MinValue;
+        private bool _hiddenForThisGame;
+        private bool _lastFetchFailed;
+        private int _fetchRetries;
+        private DateTime _nextRetryAtUtc = DateTime.MinValue;
+        // Official-board retries run on their OWN budget: a mirror hiccup must not
+        // consume the wallii retry allowance (and vice versa).
+        private bool _boardMissing;
+        private int _boardRetries;
+        private DateTime _nextBoardRetryAtUtc = DateTime.MinValue;
+        // The wallii-only baseline currently on screen (current generation). Board
+        // retries re-run just the board layer over clones of it — no wallii
+        // round-trip, no baseline repaint.
+        private List<PlayerSummary> _baseline;
+        // What the panel actually displays right now (baseline or board-corrected).
+        // Board repaints compare against THIS, so a repeated fill that lands the
+        // same values never churns the rows, while a fill whose predecessor was
+        // lost to a generation bump still paints.
+        private List<PlayerSummary> _lastPainted;
+        private bool _previewActive;
+        private int _previewGeneration;
+        private SettingsWindow _settingsWindow;
+        private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
+        private bool _spectateNoticeShown;
+        private System.Windows.Threading.DispatcherTimer _saveDebounce;
+
+        /// <summary>True once the user has chosen an explicit scale (mouse wheel).</summary>
+        private bool _scaleTouched;
+
+        public void Load()
+        {
+
+            var dir = DataDirectory;
+            ImportPluginSettings(dir);
+            _settings = PluginSettings.Load(dir);
+            // Wheel-zoom raises LayoutChanged on every notch; an XML write per
+            // notch can stutter on slow disks. Collect the burst, write once.
+            _saveDebounce = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(500),
+            };
+            _saveDebounce.Tick += (s, e) =>
+            {
+                _saveDebounce.Stop();
+                _settings.Save();
+            };
+            ThemeManager.Apply(_settings.Theme);
+            ThemeManager.ApplyChipStyle(_settings.ChipStyle);
+            _wallii = new WalliiService(
+                new WalliiApi(_settings.WalliiBaseUrl, _settings.WalliiAnonKey),
+                new OfficialBoardClient(_settings.OfficialBoardUrl, dir));
+
+            _panel = new LobbyPanel { Visibility = System.Windows.Visibility.Collapsed };
+            _popup = new PlayerDetailsPopup { Visibility = System.Windows.Visibility.Collapsed };
+            _settingsCard = new SettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending, SetChipStyle)
+            {
+                Visibility = System.Windows.Visibility.Collapsed,
+            };
+            _settingsCard.CloseRequested += HideSettingsCard;
+
+            Canvas.SetLeft(_panel, SafeCoord(_settings.PanelLeft, 40));
+            Canvas.SetTop(_panel, SafeCoord(_settings.PanelTop, 130));
+            // Provisional until the overlay window has a real size (see ShowPanel):
+            // at plugin load HDT's overlay still has its design-time dimensions.
+            _panel.PanelScale = _settings.Scale > 0 ? _settings.Scale : 1.0;
+            _popup.PanelScale = _panel.PanelScale;
+            _scaleTouched = _settings.Scale > 0;
+
+
+            _panel.PlayerClicked += OnPlayerClicked;
+            _panel.LayoutChanged += SaveLayout;
+            _panel.SettingsRequested += ToggleSettingsCard;
+            _panel.ScaleChangedByUser += () =>
+            {
+                _scaleTouched = true;
+                _popup.PanelScale = _panel.PanelScale;
+                _settingsCard.CardScale = _panel.PanelScale;
+            };
+            _panel.SortAscending = _settings.SortAscending;
+            _panel.IsCollapsed = _settings.Collapsed;
+            _panel.CollapsedChanged += collapsed =>
+            {
+                _settings.Collapsed = collapsed;
+                _settings.Save();
+            };
+            _popup.CloseRequested += () => _popupGeneration++;
+
+            // Attach to the overlay last so a failure above cannot orphan the controls.
+            _overlay.Surface.Children.Add(_panel);
+            _overlay.Surface.Children.Add(_popup);
+            _overlay.Surface.Children.Add(_settingsCard);
+
+            Logger.Info("Overlay ready");
+        }
+
+        public void Unload()
+        {
+            try
+            {
+                // Flush synchronously — a pending debounced write would race
+                // HDT's shutdown and could lose the last zoom or drag.
+                _saveDebounce?.Stop();
+                if (_panel != null && _settings != null)
+                {
+                    CaptureLayout();
+                    _settings.Save();
+                }
+                ThemeManager.Reset();
+                try { _settingsWindow?.Close(); } catch { }
+                _settingsWindow = null;
+                if (_panel != null)
+                {
+                    _overlay.Surface.Children.Remove(_panel);
+                    _overlay.Surface.Children.Remove(_popup);
+                    _overlay.Surface.Children.Remove(_settingsCard);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Unload failed", ex);
+            }
+        }
+
+        /// <summary>Called by the plugin host (throttled by the entry class).</summary>
+        public void Tick()
+        {
+            try
+            {
+                if (!_settings.OverlayEnabled)
+                    return;
+
+                if (!_tracker.InBattlegroundsMatch)
+                {
+                    if (_phase != Phase.Idle)
+                        ResetToIdle();
+                    return;
+                }
+
+                // In a battlegrounds match.
+                if (_phase == Phase.Idle)
+                {
+                    _phase = Phase.WaitingForLobby;
+                    _tracker.Reset();
+                    _hiddenForThisGame = false;
+                    _previewActive = false; // a real match replaces the sample preview
+                    HideSettingsCard();     // a stray card over hero-pick hurts most
+                    _panel.ShowWaiting();
+                    ShowPanel();
+                }
+
+                if (_hiddenForThisGame)
+                    return;
+
+                if (_phase == Phase.WaitingForLobby)
+                {
+                    var lobby = _tracker.TryResolveLobby();
+                    if (lobby != null && lobby.Players.Count > 0)
+                    {
+                        _lobby = lobby;
+                        _phase = Phase.Fetching;
+                        _panel.ShowLoading(lobby.Players);
+                        var generation = ++_fetchGeneration;
+                        _ = FetchLobbyStatsAsync(lobby, generation);
+                    }
+                    else if (!_spectateNoticeShown && _tracker.IsSpectating)
+                    {
+                        // Spectated games never hand over the roster — but hovering
+                        // the leaderboard portraits reveals names one by one (the
+                        // hover reader picks them up and the panel fills in).
+                        _spectateNoticeShown = true;
+                        _panel.SetStatus("Spectating — hover the leaderboard portraits to reveal players");
+                    }
+                }
+                else if (_phase == Phase.Loaded || _phase == Phase.Fetching)
+                {
+                    if ((DateTime.UtcNow - _lastLiveRefresh).TotalSeconds >= 2)
+                    {
+                        _lastLiveRefresh = DateTime.UtcNow;
+                        if (_lobby != null)
+                        {
+                            _tracker.AttachHeroEntities(_lobby.Players, _lobby.GameUuid);
+                            _panel.UpdateLiveState(_lobby.Players);
+                        }
+                    }
+
+                    // Transient wallii failure: retry a few times over the course of the game.
+                    if (_phase == Phase.Loaded && _lastFetchFailed && _fetchRetries < 3 &&
+                        DateTime.UtcNow >= _nextRetryAtUtc && _lobby != null)
+                    {
+                        _lastFetchFailed = false;
+                        _fetchRetries++;
+                        _phase = Phase.Fetching;
+                        var generation = ++_fetchGeneration;
+                        _ = FetchLobbyStatsAsync(_lobby, generation, isRetry: true);
+                    }
+
+                    // Transient official-board failure: dash rows are curable, so the
+                    // board gets its own in-game retries (30/60/120 s). Board-only:
+                    // the baseline on screen is already the best wallii knowledge, so
+                    // only the board layer re-runs — no wallii round-trip, no repaint
+                    // unless the board actually delivers something.
+                    if (_phase == Phase.Loaded && _boardMissing && _boardRetries < 3 &&
+                        DateTime.UtcNow >= _nextBoardRetryAtUtc && _lobby != null &&
+                        _baseline != null)
+                    {
+                        _boardMissing = false; // the refill below re-evaluates it
+                        _boardRetries++;
+                        _ = RetryBoardFillAsync(_lobby, _baseline, _fetchGeneration);
+                    }
+
+                    // A partial roster (e.g. right after a reconnect) keeps improving as
+                    // more names surface, and a roster accepted from stale metadata is
+                    // replaced once HDT surfaces the real lobby of a NEW game (its
+                    // uuid differs from the one the current roster came from).
+                    if (_phase == Phase.Loaded && _lobby != null &&
+                        (DateTime.UtcNow - _lastPartialLobbyRetry).TotalSeconds >= 5)
+                    {
+                        _lastPartialLobbyRetry = DateTime.UtcNow;
+                        var better = _tracker.TryResolveLobby();
+                        if (better != null &&
+                            (better.Players.Count > _lobby.Players.Count ||
+                             // A late-resolving region unlocks the entire board
+                             // layer (and region-correct wallii rows) — refetch.
+                             (better.Region != null && _lobby.Region == null) ||
+                             (better.GameUuid != null && better.GameUuid != _lobby.GameUuid)))
+                        {
+                            _lobby = better;
+                            _phase = Phase.Fetching;
+                            var generation = ++_fetchGeneration;
+                            _ = FetchLobbyStatsAsync(better, generation);
+                        }
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Tick failed", ex);
+            }
+        }
+
+        private async Task FetchLobbyStatsAsync(LobbyState lobby, int generation, bool isRetry = false)
+        {
+            List<PlayerSummary> summaries;
+            string statusMessage = null;
+            try
+            {
+                var names = lobby.Players.Select(p => p.Name).ToList();
+                summaries = await _wallii.GetLobbyStatsAsync(names, lobby.Region, lobby.GameMode)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Lobby stats fetch failed", ex);
+                statusMessage = ex is WalliiAuthException
+                    ? "wallii.gg key rejected — see plugin settings"
+                    : "wallii.gg unavailable — will retry";
+                _lastFetchFailed = true;
+                _nextRetryAtUtc = DateTime.UtcNow.AddSeconds(30);
+                summaries = lobby.Players
+                    .Select(p => new PlayerSummary { LobbyName = p.Name, OnLeaderboard = false })
+                    .ToList();
+            }
+
+            // A retry that failed AGAIN has no new wallii data: repainting fresh
+            // placeholders would wipe the board fills already on screen and blink
+            // every row, so the baseline paint goes quiet. The BOARD layer below
+            // still runs — during an outage these retries are exactly the chances
+            // the board has to land (or to redo a fill that a generation bump cut
+            // short mid-flight).
+            var quietBaseline = isRetry && statusMessage != null;
+
+            // PHASE 1 — the wallii-only baseline paints immediately (v1.0.7 timing
+            // and semantics): a slow or unreachable leaderboard source must never
+            // delay the first render.
+            DecorateWithGameInfo(summaries, lobby);
+            RunOnUi(() =>
+            {
+                if (generation != _fetchGeneration)
+                    return;
+                _phase = Phase.Loaded;
+                if (!quietBaseline)
+                {
+                    _baseline = summaries;
+                    _lastPainted = summaries;
+                    _panel.SetStats(summaries);
+                }
+                if (statusMessage != null)
+                    _panel.SetStatus(statusMessage);
+            });
+
+            // PHASE 2 — the official-board layer (rating authority, case-exact
+            // namesakes, fallback ratings, wallii-outage degradation) lands as a
+            // second paint once the board arrives; if it never does, the panel
+            // simply stays on the baseline. Runs on independent clones so the
+            // background fill can never race rows already handed to the UI, and
+            // repaints only when the board actually changed something — an
+            // identical second paint would just churn the rows.
+            var corrected = summaries.Select(WalliiService.CloneSummary).ToList();
+            // Decoration first: the identity gate exempts the LOCAL player, so
+            // IsLocalPlayer must be known before the board layer runs.
+            DecorateWithGameInfo(corrected, lobby);
+            var boardMissing = await _wallii
+                .TryFillOfficialRatingsAsync(corrected, lobby.Region, lobby.GameMode)
+                .ConfigureAwait(false);
+            RunOnUi(() =>
+            {
+                if (generation != _fetchGeneration)
+                    return;
+                // Arm (or disarm) the board retry loop; the backoff doubles per try.
+                _boardMissing = boardMissing;
+                if (boardMissing)
+                {
+                    _nextBoardRetryAtUtc = DateTime.UtcNow.AddSeconds(30 << _boardRetries);
+                    return;
+                }
+                _boardRetries = 0;
+                if (BoardChangedAnything(_lastPainted, corrected))
+                {
+                    _lastPainted = corrected;
+                    _panel.SetStats(corrected);
+                    if (statusMessage != null)
+                        _panel.SetStatus(statusMessage);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Board-only retry: re-runs the official-board layer over clones of the
+        /// baseline already on screen. The wallii data cannot have improved (its
+        /// retries are separate), so nothing else is refetched or repainted.
+        /// </summary>
+        private async Task RetryBoardFillAsync(LobbyState lobby, List<PlayerSummary> baseline, int generation)
+        {
+            try
+            {
+                var corrected = baseline.Select(WalliiService.CloneSummary).ToList();
+                DecorateWithGameInfo(corrected, lobby);
+                var boardMissing = await _wallii
+                    .TryFillOfficialRatingsAsync(corrected, lobby.Region, lobby.GameMode)
+                    .ConfigureAwait(false);
+                RunOnUi(() =>
+                {
+                    if (generation != _fetchGeneration)
+                        return;
+                    _boardMissing = boardMissing;
+                    if (boardMissing)
+                    {
+                        _nextBoardRetryAtUtc = DateTime.UtcNow.AddSeconds(30 << _boardRetries);
+                        return;
+                    }
+                    _boardRetries = 0;
+                    if (BoardChangedAnything(_lastPainted, corrected))
+                    {
+                        _lastPainted = corrected;
+                        _panel.SetStats(corrected);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Board retry failed", ex);
+            }
+        }
+
+        /// <summary>
+        /// True when the board layer changed anything the panel actually shows.
+        /// The compared fields are exactly the ones the fill mutates; everything
+        /// else is identical by construction (clones of the same baseline).
+        /// </summary>
+        private static bool BoardChangedAnything(
+            List<PlayerSummary> before, List<PlayerSummary> after)
+        {
+            if (before == null || before.Count != after.Count)
+                return true;
+            for (var i = 0; i < before.Count && i < after.Count; i++)
+            {
+                var a = before[i];
+                var b = after[i];
+                if (a.OnLeaderboard != b.OnLeaderboard || a.Rating != b.Rating ||
+                    a.Rank != b.Rank || a.FallbackRating != b.FallbackRating ||
+                    a.FallbackRank != b.FallbackRank || a.BelowCutoff != b.BelowCutoff ||
+                    a.NamesakeSuspected != b.NamesakeSuspected)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Pairs stats with in-game info positionally — the stats list preserves
+        /// roster order, and a name lookup would glue lobby namesakes (same base
+        /// name, different battletags) to whichever of them comes first.
+        /// </summary>
+        private static void DecorateWithGameInfo(List<PlayerSummary> summaries, LobbyState lobby)
+        {
+            for (var i = 0; i < summaries.Count; i++)
+            {
+                var summary = summaries[i];
+                var player = i < lobby.Players.Count &&
+                             string.Equals(lobby.Players[i].Name, summary.LobbyName,
+                                 StringComparison.OrdinalIgnoreCase)
+                    ? lobby.Players[i]
+                    : lobby.Players.FirstOrDefault(p =>
+                        string.Equals(p.Name, summary.LobbyName, StringComparison.OrdinalIgnoreCase));
+                if (player != null)
+                {
+                    summary.IsLocalPlayer = player.IsLocalPlayer;
+                    summary.HeroCardId = player.HeroCardId;
+                    summary.GamePlayerId = player.PlayerId;
+                    summary.TeamId = player.TeamId;
+                }
+            }
+        }
+
+        private async void OnPlayerClicked(PlayerSummary summary)
+        {
+            var generation = ++_popupGeneration;
+            try
+            {
+                HideSettingsCard(); // dossier and settings share the panel-side slot
+                PositionPopupNextToPanel();
+                _popup.ShowLoading(summary);
+                var details = await _wallii
+                    .GetPlayerDetailsAsync(summary, _lobby?.GameMode ?? "0", _settings.RecentGamesCount)
+                    .ConfigureAwait(true);
+                if (generation != _popupGeneration)
+                    return; // a newer click superseded this one
+                if (details == null)
+                    _popup.ShowError(summary, "No wallii data for this player.");
+                else
+                    _popup.SetData(details);
+            }
+            catch (WalliiAuthException ex)
+            {
+                Logger.Error("wallii auth failed", ex);
+                if (generation == _popupGeneration)
+                    _popup.ShowError(summary, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to load player details", ex);
+                if (generation == _popupGeneration)
+                    _popup.ShowError(summary, "wallii.gg request failed. Check your connection and try again.");
+            }
+        }
+
+        /// <summary>
+        /// Toggles the overlay. During a Battlegrounds match this hides or brings back
+        /// the real panel (e.g. after the user closed it with ✕); outside of a match it
+        /// shows a preview with the current top-8 wallii players for positioning.
+        /// </summary>
+        public void ToggleOverlay()
+        {
+            try
+            {
+                if (_panel.Visibility == System.Windows.Visibility.Visible)
+                {
+                    _previewActive = false;
+                    _previewGeneration++;
+                    if (_phase != Phase.Idle)
+                        _hiddenForThisGame = true;
+                    HidePanel();
+                    return;
+                }
+
+                _hiddenForThisGame = false;
+
+                if (_phase != Phase.Idle)
+                {
+                    // Mid-match: restore the real panel; Tick resumes lobby
+                    // resolution / live updates from wherever it left off.
+                    ShowPanel();
+                    return;
+                }
+
+                // No match running: preview with the live global top-8.
+                _previewActive = true;
+                _panel.ShowWaiting();
+                _panel.SetStatus("PREVIEW — loading top players…");
+                ShowPanel();
+                _ = ShowTopPreviewAsync(++_previewGeneration);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ToggleOverlay failed", ex);
+            }
+        }
+
+        private async Task ShowTopPreviewAsync(int generation)
+        {
+            List<PlayerSummary> lobby;
+            string status;
+            var live = true;
+            try
+            {
+                lobby = await _wallii.GetTopLobbyAsync("0").ConfigureAwait(false);
+                status = "PREVIEW — current top 8 · wallii.gg";
+                if (lobby.Count == 0)
+                    throw new WalliiApiException("empty top-players result", null);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Top-8 preview unavailable, using sample data: " + ex.Message);
+                lobby = SampleData.Lobby();
+                status = "PREVIEW — sample data (wallii.gg unavailable)";
+                live = false;
+            }
+
+            RunOnUi(() =>
+            {
+                if (generation != _previewGeneration || !_previewActive)
+                    return;
+                _panel.SetStats(lobby);
+                _panel.SetStatus(status);
+                if (live)
+                {
+                    PositionPopupNextToPanel();
+                    var first = lobby.Find(p => p.OnLeaderboard);
+                    if (first != null)
+                        OnPlayerClicked(first);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Toggles the in-overlay settings card next to the panel (gear button).
+        /// Runs on the overlay, so the game never loses focus and a stray click
+        /// costs one more click on the same gear. Mutually exclusive with the
+        /// dossier popup — they share the space beside the panel.
+        /// </summary>
+        public void ToggleSettingsCard()
+        {
+            try
+            {
+                if (_settingsCard.Visibility == System.Windows.Visibility.Visible)
+                {
+                    HideSettingsCard();
+                    return;
+                }
+                _popupGeneration++; // cancel an in-flight dossier fetch re-showing the popup
+                _popup.Visibility = System.Windows.Visibility.Collapsed;
+                _settingsCard.Sync(_settings.Theme, _settings.SortAscending, _settings.ChipStyle);
+                _settingsCard.CardScale = _panel.PanelScale;
+                PositionCardNextToPanel(_settingsCard, 292);
+                _settingsCard.Visibility = System.Windows.Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ToggleSettingsCard failed", ex);
+            }
+        }
+
+        private void HideSettingsCard() =>
+            _settingsCard.Visibility = System.Windows.Visibility.Collapsed;
+
+        /// <summary>Opens (or focuses) the small settings dialog.</summary>
+        public void OpenSettings()
+        {
+            try
+            {
+                if (_settingsWindow != null && _settingsWindow.IsLoaded)
+                {
+                    _settingsWindow.Activate();
+                    return;
+                }
+                _settingsWindow = new SettingsWindow(
+                    ToggleOverlay, ResetPosition, _settings.Theme, SetTheme,
+                    _settings.SortAscending, SetSortAscending,
+                    _settings.ChipStyle, SetChipStyle);
+                try { /* no owner window outside HDT */ }
+                catch { /* owner is optional */ }
+                _settingsWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OpenSettings failed", ex);
+            }
+        }
+
+        public void SetTheme(string key)
+        {
+            _settings.Theme = key;
+            _settings.Save();
+            ThemeManager.Apply(key);
+        }
+
+        public void SetSortAscending(bool ascending)
+        {
+            _settings.SortAscending = ascending;
+            _settings.Save();
+            _panel.SortAscending = ascending; // re-sorts the current lobby in place
+        }
+
+        public void SetChipStyle(string key)
+        {
+            _settings.ChipStyle = key;
+            _settings.Save();
+            ThemeManager.ApplyChipStyle(key); // re-renders rows and the dossier live
+        }
+
+        public bool OverlayEnabled
+        {
+            get => _settings.OverlayEnabled;
+            set
+            {
+                _settings.OverlayEnabled = value;
+                _settings.Save();
+                if (!value)
+                {
+                    _previewActive = false;
+                    HidePanel();
+                }
+                else if (_phase != Phase.Idle && !_hiddenForThisGame)
+                {
+                    ShowPanel();
+                }
+            }
+        }
+
+        public void ResetPosition()
+        {
+            Canvas.SetLeft(_panel, 40);
+            Canvas.SetTop(_panel, 130);
+            _settings.PanelLeft = 40;
+            _settings.PanelTop = 130;
+            // Back to resolution-based auto scale.
+            _settings.Scale = 0;
+            _scaleTouched = false;
+            _panel.PanelScale = 1.0;
+            _popup.PanelScale = 1.0;
+            _settingsCard.CardScale = 1.0;
+            _settings.Save();
+            _hiddenForThisGame = false;
+            ShowPanel(); // re-applies the auto scale when the overlay has a real size
+            if (_settingsCard.Visibility == System.Windows.Visibility.Visible)
+                PositionCardNextToPanel(_settingsCard, 292); // follow the panel home
+        }
+
+        private void ResetToIdle()
+        {
+            _phase = Phase.Idle;
+            _lobby = null;
+            _fetchGeneration++;
+            _popupGeneration++;
+            _lastFetchFailed = false;
+            _fetchRetries = 0;
+            _boardMissing = false;
+            _boardRetries = 0;
+            _baseline = null;
+            _lastPainted = null;
+            _spectateNoticeShown = false;
+            // Whatever lobby info HDT still holds now belongs to the finished game.
+            _tracker.MarkCurrentLobbyInfoStale();
+            _tracker.Reset();
+            if (!_previewActive)
+                HidePanel();
+        }
+
+        private void ShowPanel()
+        {
+            ApplyAutoScale();
+            _panel.Visibility = System.Windows.Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Auto mode: compensate for higher game-window resolutions with a DAMPED curve
+        /// (1080p ×1.0, 1440p ×1.2, 4K ×1.6). Full proportionality made sense with the
+        /// original small typography; the current 16px HUD type only needs to recover
+        /// the physical size lost to pixel density, not the full resolution ratio.
+        /// Only runs once the overlay window has been sized to the real game window,
+        /// and is never persisted — the user's own wheel-zoom takes over for good.
+        /// </summary>
+        private void ApplyAutoScale()
+        {
+            if (_scaleTouched)
+                return;
+            try
+            {
+                var width = _overlay.ActualWidth;
+                if (width < 1000)
+                    return; // overlay not sized to the game yet
+                var auto = 1.0 + (width / 1920.0 - 1.0) * 0.6;
+                auto = Math.Max(1.0, Math.Min(auto, 1.6));
+                if (Math.Abs(_panel.PanelScale - auto) < 0.01)
+                    return;
+                _panel.PanelScale = auto;
+                _popup.PanelScale = auto;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("ApplyAutoScale: " + ex.Message);
+            }
+        }
+
+        private void HidePanel()
+        {
+            _popupGeneration++; // cancel any in-flight details fetch re-showing the popup
+            _panel.Visibility = System.Windows.Visibility.Collapsed;
+            _popup.Visibility = System.Windows.Visibility.Collapsed;
+            HideSettingsCard();
+        }
+
+        private void PositionPopupNextToPanel()
+        {
+            _popup.PanelScale = _panel.PanelScale;
+            PositionCardNextToPanel(_popup, 280);
+        }
+
+        /// <summary>Places a card right of the panel, flipping left at the screen edge.</summary>
+        private void PositionCardNextToPanel(System.Windows.FrameworkElement card, double baseWidth)
+        {
+            var left = Canvas.GetLeft(_panel);
+            var top = Canvas.GetTop(_panel);
+            if (double.IsNaN(left)) left = 40;
+            if (double.IsNaN(top)) top = 130;
+
+            var scale = _panel.PanelScale;
+            // All cards scale via layout, so ActualWidth is already final.
+            var measured = _panel.ActualWidth;
+            var panelWidth = measured > 50 ? measured : 272 * scale;
+            var cardWidth = card.ActualWidth > 50 ? card.ActualWidth : baseWidth * scale;
+            var x = left + panelWidth + 8;
+
+            var canvasWidth = _overlay.Surface.ActualWidth;
+            if (canvasWidth > 100 && x + cardWidth > canvasWidth)
+                x = Math.Max(0, left - cardWidth - 8);
+
+            Canvas.SetLeft(card, x);
+            Canvas.SetTop(card, top);
+        }
+
+        private void SaveLayout()
+        {
+            try
+            {
+                CaptureLayout();
+                _saveDebounce.Stop();
+                _saveDebounce.Start();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("SaveLayout failed", ex);
+            }
+        }
+
+        private void CaptureLayout()
+        {
+            var left = Canvas.GetLeft(_panel);
+            var top = Canvas.GetTop(_panel);
+            if (!double.IsNaN(left)) _settings.PanelLeft = left;
+            if (!double.IsNaN(top)) _settings.PanelTop = top;
+            // Persist the scale only once the user explicitly chose one; an
+            // auto-derived value must never be latched into the settings.
+            if (_scaleTouched)
+                _settings.Scale = _panel.PanelScale;
+        }
+
+        private static double SafeCoord(double value, double fallback) =>
+            double.IsNaN(value) || double.IsInfinity(value) ? fallback : Math.Max(0, value);
+
+        private void RunOnUi(Action action)
+        {
+            if (_panel.Dispatcher.CheckAccess())
+                action();
+            else
+                _panel.Dispatcher.BeginInvoke(action);
+        }
+    }
+}
