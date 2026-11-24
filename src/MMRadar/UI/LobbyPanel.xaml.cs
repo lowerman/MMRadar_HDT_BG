@@ -75,8 +75,28 @@ namespace MMRadar.UI
             Resources["HeaderBtnSize"] = R(18.0 * k);
             Resources["HeaderBtnFont"] = R(10.0 * k);
             Resources["HeaderGearFont"] = R(11.0 * k);
-            Resources["ChipColWidth"] = new GridLength(R(52.0 * k));
+            Resources["ChipColWidth"] = new GridLength(_walliiDownReason != null ? 0 : R(52.0 * k));
             RootBorder.MinWidth = _collapsed ? 0 : R(192.0 * k);
+        }
+
+        private string _walliiDownReason;
+
+        /// <summary>
+        /// Compact "wallii is unreachable" state (opt-in; null clears it): the
+        /// title dot turns coral and explains itself on hover, and the avg
+        /// column — a row of dashes without wallii — folds away entirely,
+        /// instead of a full-width status line plus eight "–" marks.
+        /// </summary>
+        public void SetWalliiUnavailable(string reason)
+        {
+            _walliiDownReason = reason;
+            Resources["ChipColVisibility"] = reason != null ? Visibility.Collapsed : Visibility.Visible;
+            ApplyLayoutScale();
+            if (reason != null)
+                TitleDot.Fill = ThemeManager.Freeze(System.Windows.Media.Color.FromArgb(0xFF, 0xF8, 0x71, 0x71));
+            else
+                TitleDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
+            TitleBlock.ToolTip = reason;
         }
 
         private IReadOnlyList<PlayerSummary> _lastSummaries;

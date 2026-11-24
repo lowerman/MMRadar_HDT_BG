@@ -28,6 +28,7 @@
             <sys:Double x:Key="HeaderBtnFont">10</sys:Double>
             <sys:Double x:Key="HeaderGearFont">11</sys:Double>
             <GridLength x:Key="ChipColWidth">52</GridLength>
+            <Visibility x:Key="ChipColVisibility">Visible</Visibility>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -56,12 +57,12 @@
                     LostMouseCapture="Header_LostMouseCapture"
                     MouseWheel="Header_MouseWheel">
                 <DockPanel Margin="12,6,6,5" LastChildFill="False">
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <StackPanel x:Name="TitleBlock" Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                         <TextBlock Text="MMR" FontSize="{DynamicResource TitleFontSize}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <TextBlock x:Name="TitleRankPart" Text="ADAR" FontSize="{DynamicResource TitleFontSize}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextSecondary}"/>
-                        <Ellipse Width="4" Height="4" Margin="5,1,0,0"
+                        <Ellipse x:Name="TitleDot" Width="4" Height="4" Margin="5,1,0,0"
                                  Fill="{DynamicResource Accent}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <!-- The gear lives NEXT TO THE TITLE, at the opposite end from
@@ -158,23 +159,24 @@
                                                HorizontalAlignment="Right"
                                                Margin="0,0,8,0"/>
 
-                                    <!-- avg placement chip -->
-                                    <Border Grid.Column="2"
-                                            Visibility="{Binding AvgVisibility}"
-                                            Background="{Binding AvgBrush}"
-                                            CornerRadius="4" Padding="0,2.5"
-                                            VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch">
-                                        <TextBlock Text="{Binding AvgText}"
-                                                   FontSize="{DynamicResource ChipFontSize}" FontWeight="Bold"
-                                                   Foreground="{Binding AvgTextBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Grid.Column="2"
-                                               Visibility="{Binding NoDataVisibility}"
-                                               Text="–" FontSize="{DynamicResource ChipFontSize}"
-                                               Foreground="{DynamicResource TextMuted}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <!-- avg placement chip (the whole column folds away
+                                         while wallii is unreachable — see SetWalliiUnavailable) -->
+                                    <Grid Grid.Column="2" Visibility="{DynamicResource ChipColVisibility}">
+                                        <Border Visibility="{Binding AvgVisibility}"
+                                                Background="{Binding AvgBrush}"
+                                                CornerRadius="4" Padding="0,2.5"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Stretch">
+                                            <TextBlock Text="{Binding AvgText}"
+                                                       FontSize="{DynamicResource ChipFontSize}" FontWeight="Bold"
+                                                       Foreground="{Binding AvgTextBrush}"
+                                                       HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Visibility="{Binding NoDataVisibility}"
+                                                   Text="–" FontSize="{DynamicResource ChipFontSize}"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
                                 </Grid>
                             </Button>
                         </DataTemplate>

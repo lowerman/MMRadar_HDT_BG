@@ -347,9 +347,13 @@ namespace MMRadar.Standalone
             catch (Exception ex)
             {
                 Logger.Error("Lobby stats fetch failed", ex);
+                // Shown as the hover text of the coral title dot — the compact
+                // outage state replaces the old full-width status line.
                 statusMessage = ex is WalliiAuthException
-                    ? "wallii.gg key rejected — see plugin settings"
-                    : "wallii.gg unavailable — will retry";
+                    ? "wallii.gg rejected the access key — showing official leaderboard ratings only.\n" +
+                      "Detailed stats return once the key is updated."
+                    : "wallii.gg is unavailable — showing official leaderboard ratings only.\n" +
+                      "Detailed stats return automatically when it is back.";
                 _lastFetchFailed = true;
                 _nextRetryAtUtc = DateTime.UtcNow.AddSeconds(30);
                 summaries = lobby.Players
@@ -374,14 +378,14 @@ namespace MMRadar.Standalone
                 if (generation != _fetchGeneration)
                     return;
                 _phase = Phase.Loaded;
+                // Compact outage state on failure; a successful fetch clears it.
+                _panel.SetWalliiUnavailable(statusMessage);
                 if (!quietBaseline)
                 {
                     _baseline = summaries;
                     _lastPainted = summaries;
                     _panel.SetStats(summaries);
                 }
-                if (statusMessage != null)
-                    _panel.SetStatus(statusMessage);
             });
 
             // PHASE 2 — the official-board layer (rating authority, case-exact
@@ -414,8 +418,6 @@ namespace MMRadar.Standalone
                 {
                     _lastPainted = corrected;
                     _panel.SetStats(corrected);
-                    if (statusMessage != null)
-                        _panel.SetStatus(statusMessage);
                 }
             });
         }
@@ -814,6 +816,7 @@ namespace MMRadar.Standalone
         /// </summary>
         private void ShowWaitingClean()
         {
+            _panel.SetWalliiUnavailable(null); // a new game starts with a clean slate
             _panel.SetStats(new List<PlayerSummary>());
             _panel.ShowWaiting();
         }
