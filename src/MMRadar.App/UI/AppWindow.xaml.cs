@@ -30,7 +30,7 @@ namespace MMRadar.Standalone
             _setAutostart = setAutostart;
             _openDataFolder = openDataFolder;
 
-            VersionText.Text = "v" + UpdateService.CurrentVersion.ToString(3);
+            Title = "MMRadar " + UpdateService.CurrentVersion.ToString(3);
 
             Settings.PreviewClicked += () => _core.ToggleOverlay();
             Settings.ResetClicked += () => _core.ResetPosition();
