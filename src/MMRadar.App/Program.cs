@@ -44,6 +44,8 @@ namespace MMRadar.Standalone
         private static UpdateInfo _pendingUpdate;
         private static bool _updating;
         private static bool _justUpdated;
+        private static bool _autostart;
+        private const string AutostartArg = "--autostart";
         private static string _installZip;
 
         public static string Version => UpdateService.CurrentVersion.ToString(3);
@@ -53,6 +55,7 @@ namespace MMRadar.Standalone
         {
             args = args ?? new string[0];
             _justUpdated = HasArg(args, "--updated");
+            _autostart = HasArg(args, AutostartArg);
 
             // One instance per user. A second launch brings the running one's
             // window up instead of complaining; right after an update the new
@@ -134,25 +137,35 @@ namespace MMRadar.Standalone
 
             BuildTray();
             ListenForShowRequests();
+            // Refresh an existing autostart entry: older builds wrote it without the
+            // quiet-start flag, and the exe may have moved since.
+            if (IsAutostartEnabled())
+                SetAutostart(true);
 
-            if (!_core.AppSettings.WelcomeShown)
-            {
-                ShowWindow();
-                _window.ShowWelcome();
-                _core.AppSettings.WelcomeShown = true;
-                _core.AppSettings.Save();
-            }
-            else if (_justUpdated)
+            if (_justUpdated)
             {
                 _tray.ShowBalloonTip(4000, $"MMRadar updated to {Version}",
                     "Everything is ready — your settings were kept.", Forms.ToolTipIcon.Info);
             }
-            else
+            else if (_autostart && _core.AppSettings.WelcomeShown)
             {
+                // Started with Windows: settle quietly into the tray.
                 _tray.ShowBalloonTip(4000,
                     AppCore.SimulateWalliiDown ? "MMRadar is running — wallii outage simulation" : "MMRadar is running",
                     "The panel appears automatically in Battlegrounds. Click here for options.",
                     Forms.ToolTipIcon.Info);
+            }
+            else
+            {
+                // Launched by hand: show the window — a tray icon alone is easy to
+                // miss and reads as "nothing happened". The welcome card only once.
+                ShowWindow();
+                if (!_core.AppSettings.WelcomeShown)
+                {
+                    _window.ShowWelcome();
+                    _core.AppSettings.WelcomeShown = true;
+                    _core.AppSettings.Save();
+                }
             }
 
             if (_installZip != null)
@@ -466,7 +479,7 @@ namespace MMRadar.Standalone
                 using (var key = Registry.CurrentUser.CreateSubKey(RunKey))
                 {
                     if (enabled)
-                        key.SetValue(RunValue, $"\"{Assembly.GetExecutingAssembly().Location}\"");
+                        key.SetValue(RunValue, $"\"{Assembly.GetExecutingAssembly().Location}\" {AutostartArg}");
                     else
                         key.DeleteValue(RunValue, false);
                 }
