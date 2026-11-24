@@ -100,6 +100,11 @@ namespace MMRadar.Standalone
         private bool _previewActive;
         private int _previewGeneration;
         private SettingsWindow _settingsWindow;
+        private AppSettings _appSettings;
+        // Which player the details card currently belongs to (toggle on re-click).
+        private string _popupKey;
+        // Card position when a header press began — tells a drag from a click.
+        private System.Windows.Point? _popupDragFrom;
         private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
         private bool _spectateNoticeShown;
         private System.Windows.Threading.DispatcherTimer _saveDebounce;
@@ -113,6 +118,7 @@ namespace MMRadar.Standalone
             var dir = DataDirectory;
             ImportPluginSettings(dir);
             _settings = PluginSettings.Load(dir);
+            _appSettings = AppSettings.Load(dir);
             // Wheel-zoom raises LayoutChanged on every notch; an XML write per
             // notch can stutter on slow disks. Collect the burst, write once.
             _saveDebounce = new System.Windows.Threading.DispatcherTimer
@@ -164,6 +170,11 @@ namespace MMRadar.Standalone
                 _settings.Save();
             };
             _popup.CloseRequested += () => _popupGeneration++;
+            // The card drags itself by its header; remember where it was dropped.
+            _popup.Header.PreviewMouseLeftButtonDown += (s, e) =>
+                _popupDragFrom = new System.Windows.Point(Canvas.GetLeft(_popup), Canvas.GetTop(_popup));
+            _popup.Header.MouseLeftButtonUp += (s, e) => RememberPopupPosition();
+            _popup.Header.LostMouseCapture += (s, e) => RememberPopupPosition();
 
             // Attach to the overlay last so a failure above cannot orphan the controls.
             _overlay.Surface.Children.Add(_panel);
@@ -492,8 +503,25 @@ namespace MMRadar.Standalone
             }
         }
 
-        private async void OnPlayerClicked(PlayerSummary summary)
+        private void OnPlayerClicked(PlayerSummary summary) => ShowPlayerDetails(summary, toggle: true);
+
+        /// <summary>Identity of a lobby row: namesakes differ by their game player id.</summary>
+        private static string PopupKey(PlayerSummary s) =>
+            (s.LobbyName ?? "").ToLowerInvariant() + "|" + s.GamePlayerId;
+
+        private async void ShowPlayerDetails(PlayerSummary summary, bool toggle)
         {
+            // A second click on the player whose card is already open closes it.
+            var key = PopupKey(summary);
+            if (toggle && _popup.Visibility == System.Windows.Visibility.Visible && key == _popupKey)
+            {
+                _popupGeneration++; // cancel an in-flight fetch re-showing it
+                _popup.Visibility = System.Windows.Visibility.Collapsed;
+                _popupKey = null;
+                return;
+            }
+            _popupKey = key;
+
             var generation = ++_popupGeneration;
             try
             {
@@ -597,7 +625,7 @@ namespace MMRadar.Standalone
                     PositionPopupNextToPanel();
                     var first = lobby.Find(p => p.OnLeaderboard);
                     if (first != null)
-                        OnPlayerClicked(first);
+                        ShowPlayerDetails(first, toggle: false); // the preview always opens it
                 }
             });
         }
@@ -699,6 +727,12 @@ namespace MMRadar.Standalone
 
         public void ResetPosition()
         {
+            // The details card goes back to its default spot next to the panel too.
+            _appSettings.PopupLeftFraction = null;
+            _appSettings.PopupTopFraction = null;
+            _appSettings.Save();
+            if (_popup.Visibility == System.Windows.Visibility.Visible)
+                PositionPopupNextToPanel();
             Canvas.SetLeft(_panel, 40);
             Canvas.SetTop(_panel, 130);
             _settings.PanelLeft = 40;
@@ -794,7 +828,55 @@ namespace MMRadar.Standalone
         private void PositionPopupNextToPanel()
         {
             _popup.PanelScale = _panel.PanelScale;
-            PositionCardNextToPanel(_popup, 280);
+            if (!TryPlacePopupAtSavedPosition())
+                PositionCardNextToPanel(_popup, 280);
+        }
+
+        /// <summary>
+        /// Puts the card where the user last dropped it (stored as a fraction of
+        /// the overlay size), clamped so it can never end up off screen.
+        /// </summary>
+        private bool TryPlacePopupAtSavedPosition()
+        {
+            var fx = _appSettings.PopupLeftFraction;
+            var fy = _appSettings.PopupTopFraction;
+            var w = _overlay.Surface.ActualWidth;
+            var h = _overlay.Surface.ActualHeight;
+            if (fx == null || fy == null || w < 100 || h < 100)
+                return false;
+            var cardWidth = _popup.ActualWidth > 50 ? _popup.ActualWidth : 280 * _panel.PanelScale;
+            var left = Math.Max(0, Math.Min(fx.Value * w, w - Math.Min(cardWidth, w)));
+            var top = Math.Max(0, Math.Min(fy.Value * h, h - 80));
+            Canvas.SetLeft(_popup, left);
+            Canvas.SetTop(_popup, top);
+            return true;
+        }
+
+        private void RememberPopupPosition()
+        {
+            try
+            {
+                if (_popupDragFrom == null)
+                    return;
+                var from = _popupDragFrom.Value;
+                _popupDragFrom = null;
+                var left = Canvas.GetLeft(_popup);
+                var top = Canvas.GetTop(_popup);
+                var w = _overlay.Surface.ActualWidth;
+                var h = _overlay.Surface.ActualHeight;
+                if (double.IsNaN(left) || double.IsNaN(top) || w < 100 || h < 100)
+                    return;
+                // A plain click on the header (or its close button) is not a move.
+                if (Math.Abs(left - from.X) < 3 && Math.Abs(top - from.Y) < 3)
+                    return;
+                _appSettings.PopupLeftFraction = left / w;
+                _appSettings.PopupTopFraction = top / h;
+                _appSettings.Save();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("RememberPopupPosition failed", ex);
+            }
         }
 
         /// <summary>Places a card right of the panel, flipping left at the screen edge.</summary>
