@@ -28,6 +28,8 @@ namespace MMRadar.Overlay
         private IntPtr _gameHwnd;
         private DateTime _nextGameLookupUtc = DateTime.MinValue;
         private Rect _lastBounds = Rect.Empty;
+        private bool _gameWasForeground;
+        private DateTime _nextTopmostCheckUtc = DateTime.MinValue;
 
         public Canvas Surface { get; }
 
@@ -112,12 +114,22 @@ namespace MMRadar.Overlay
                     if (device.Width > 100 && device.Height > 100)
                         Place(ToDips(device));
                 }
-                SetShown(Wanted);
-                if (fg == game && _hwnd != IntPtr.Zero)
+                var becameVisible = SetShown(Wanted);
+                var gameFg = fg == game;
+                // Fullscreen games can claim the top of the z-order when they
+                // (re)gain focus — re-assert then. NOT on every tick: tooltips
+                // are separate topmost popups, and a constant re-assert pushed
+                // the overlay above its own hover text. The slow periodic
+                // safety net only runs while the cursor is off the panel, i.e.
+                // while no tooltip can be open.
+                var regained = gameFg && !_gameWasForeground;
+                var periodic = gameFg && !IsMouseOver && DateTime.UtcNow >= _nextTopmostCheckUtc;
+                if (_hwnd != IntPtr.Zero && Wanted && (regained || becameVisible || periodic))
                 {
-                    // Fullscreen games can claim the top of the z-order; re-assert.
                     SetWindowPos(_hwnd, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate);
+                    _nextTopmostCheckUtc = DateTime.UtcNow.AddSeconds(5);
                 }
+                _gameWasForeground = gameFg;
             }
             catch (Exception ex)
             {
@@ -156,11 +168,16 @@ namespace MMRadar.Overlay
             Height = bounds.Height;
         }
 
-        private void SetShown(bool shown)
+        /// <summary>Returns true when the window just went from hidden to shown.</summary>
+        private bool SetShown(bool shown)
         {
             var v = shown ? Visibility.Visible : Visibility.Hidden;
-            if (Visibility != v)
-                Visibility = v;
+            if (Visibility == v)
+                return false;
+            Visibility = v;
+            if (!shown)
+                _gameWasForeground = false;
+            return shown;
         }
 
         private Rect ToDips(Rect device)
