@@ -120,40 +120,44 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="ModeButton" TargetType="Button" BasedOn="{StaticResource LinkButton}">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
     </Window.Resources>
 
-    <StackPanel Margin="18,14,18,16" Width="260">
-        <!-- Two tabs instead of one long page -->
+    <StackPanel Margin="16,14,16,16" Width="280">
+        <!-- Home: what you open the app for. Panel / App: configuration. -->
         <Border Background="{StaticResource CardFill}" CornerRadius="9" Padding="3">
-            <UniformGrid Columns="2">
-                <Button x:Name="TabGeneral" Style="{StaticResource TabButton}" Click="TabGeneral_Click">
+            <UniformGrid Columns="3">
+                <Button x:Name="TabHome" Style="{StaticResource TabButton}" Click="TabHome_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="General"/>
+                        <TextBlock Text="Home"/>
                         <Ellipse x:Name="UpdateDot" Width="6" Height="6" Fill="#FF34C286"
                                  Margin="6,1,0,0" VerticalAlignment="Center" Visibility="Collapsed"
                                  ToolTip="An update is available"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="TabPanel" Style="{StaticResource TabButton}" Click="TabPanel_Click" Content="Panel"/>
+                <Button x:Name="TabApp" Style="{StaticResource TabButton}" Click="TabApp_Click" Content="App"/>
             </UniformGrid>
         </Border>
 
-        <!-- Both pages share one cell; the hidden one still reserves its size,
-             so the window keeps one height while switching tabs. -->
-        <Grid Margin="0,14,0,0">
-            <StackPanel x:Name="GeneralPage">
-                <Border Background="{StaticResource CardFill}" CornerRadius="8" Padding="11,8" Margin="0,0,0,10">
-                    <DockPanel>
-                        <Ellipse x:Name="StatusDot" Width="7" Height="7" DockPanel.Dock="Left"
-                                 VerticalAlignment="Top" Margin="0,5,9,0" Fill="#FF8B949E"/>
-                        <StackPanel>
-                            <TextBlock x:Name="StatusTitle" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
-                            <TextBlock x:Name="StatusDetail" FontSize="11" Foreground="{StaticResource TextMuted}"
-                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
-                        </StackPanel>
-                    </DockPanel>
-                </Border>
+        <!-- All pages share one cell; hidden ones still reserve their size, so
+             switching tabs never resizes the window. -->
+        <Grid Margin="0,12,0,0">
+
+            <!-- HOME -->
+            <StackPanel x:Name="HomePage">
+                <!-- Status: one compact line -->
+                <DockPanel Margin="2,0,0,10">
+                    <Ellipse x:Name="StatusDot" Width="7" Height="7" DockPanel.Dock="Left"
+                             VerticalAlignment="Center" Margin="0,0,8,0" Fill="#FF8B949E"/>
+                    <TextBlock FontSize="11.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                        <Run x:Name="StatusTitle" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                        <Run x:Name="StatusDetail" Foreground="{StaticResource TextMuted}"/>
+                    </TextBlock>
+                </DockPanel>
 
                 <!-- First run only -->
                 <Border x:Name="WelcomeCard" Background="{StaticResource CardFill}" CornerRadius="8"
@@ -186,8 +190,32 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="APP" FontSize="9.5" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextMuted}" Margin="2,4,0,7"/>
+                <!-- Your own stats -->
+                <DockPanel Margin="2,2,2,7">
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                        <Button x:Name="SoloButton" Style="{StaticResource ModeButton}" Content="Solo" Click="Solo_Click"/>
+                        <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        <Button x:Name="DuosButton" Style="{StaticResource ModeButton}" Content="Duos" Click="Duos_Click"/>
+                    </StackPanel>
+                    <TextBlock Text="YOUR STATS" FontSize="9.5" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                </DockPanel>
+                <Grid>
+                    <ui:PlayerDetailsPopup x:Name="Dossier" Visibility="Collapsed"/>
+                    <Border x:Name="ProfileEmpty" Background="{StaticResource CardFill}" CornerRadius="8" Padding="12,11">
+                        <TextBlock x:Name="ProfileEmptyText" FontSize="11.5" Foreground="{StaticResource TextMuted}"
+                                   TextWrapping="Wrap"
+                                   Text="Start Hearthstone once — MMRadar picks up your account from the game and shows your stats here."/>
+                    </Border>
+                </Grid>
+            </StackPanel>
+
+            <!-- PANEL: the overlay's look and position (shared with the plugin as-is) -->
+            <ui:SettingsContent x:Name="Settings" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                Visibility="Hidden"/>
+
+            <!-- APP -->
+            <StackPanel x:Name="AppPage" Visibility="Hidden">
                 <CheckBox x:Name="AutostartBox" Content="Start with Windows"
                           Checked="AutostartBox_Changed" Unchecked="AutostartBox_Changed"/>
                 <CheckBox x:Name="AutoUpdateBox" Content="Check for updates automatically"
@@ -204,12 +232,10 @@
                 <TextBlock x:Name="CheckResult" FontSize="11" Foreground="{StaticResource TextMuted}"
                            TextWrapping="Wrap" Margin="2,5,0,0" Visibility="Collapsed"/>
 
-                <TextBlock FontSize="10.5" Foreground="#FF7D848C" TextWrapping="Wrap" Margin="2,12,0,0"
-                           Text="Closing this window keeps MMRadar in the tray."/>
+                <TextBlock x:Name="AboutText" FontSize="10.5" Foreground="#FF7D848C" TextWrapping="Wrap" Margin="2,14,0,0"/>
+                <TextBlock FontSize="10.5" Foreground="#FF7D848C" TextWrapping="Wrap" Margin="2,4,0,0"
+                           Text="Closing the window keeps MMRadar in the tray; use Exit in the tray menu to quit."/>
             </StackPanel>
-
-            <!-- The panel's look and position (shared with the plugin as-is) -->
-            <ui:SettingsContent x:Name="Settings" VerticalAlignment="Top" Visibility="Hidden"/>
         </Grid>
     </StackPanel>
 </Window>

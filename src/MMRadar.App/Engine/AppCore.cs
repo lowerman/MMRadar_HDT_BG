@@ -114,6 +114,52 @@ namespace MMRadar.Standalone
         /// <summary>App-only settings, shared with the app window and the updater.</summary>
         public AppSettings AppSettings => _appSettings;
 
+        /// <summary>
+        /// The user's own stats for the app window's Home tab: wallii summary +
+        /// recent games when tracked; otherwise the official-board rating (or the
+        /// "below the cutoff" verdict), which also covers a wallii outage.
+        /// </summary>
+        public async Task<OwnProfile> LoadOwnProfileAsync(string battleTag, string region, string mode, int games)
+        {
+            var name = GameTracker.StripTag(battleTag);
+            var profile = new OwnProfile();
+            List<PlayerSummary> list;
+            try
+            {
+                list = await _wallii.GetLobbyStatsAsync(new[] { name }, region, mode).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Own profile: wallii unavailable — " + ex.Message);
+                profile.WalliiDown = true;
+                list = new List<PlayerSummary> { new PlayerSummary { LobbyName = name } };
+            }
+            var s = list.FirstOrDefault() ?? new PlayerSummary { LobbyName = name };
+            s.IsLocalPlayer = true; // exempt from the namesake gate: this IS the user
+            try
+            {
+                await _wallii.TryFillOfficialRatingsAsync(list, region, mode).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Own profile: board fill failed — " + ex.Message);
+            }
+            profile.Summary = s;
+            if (s.OnLeaderboard && !profile.WalliiDown)
+            {
+                try
+                {
+                    profile.Details = await _wallii.GetPlayerDetailsAsync(s, mode, games).ConfigureAwait(true);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug("Own profile details failed: " + ex.Message);
+                    profile.WalliiDown = true;
+                }
+            }
+            return profile;
+        }
+
         public string Theme => _settings.Theme;
         public bool SortAscending => _settings.SortAscending;
         public string ChipStyle => _settings.ChipStyle;

@@ -29,6 +29,14 @@ namespace MMRadar.Standalone
         /// <summary>The newest version the tray balloon already announced (no nagging).</summary>
         public string LastAnnouncedVersion { get; set; }
 
+        /// <summary>The user's account as last read from the game — lets the Home
+        /// tab show their stats even while Hearthstone is closed.</summary>
+        public string LastBattleTag { get; set; }
+        public string LastRegion { get; set; }
+
+        /// <summary>Home tab's stats mode: "0" solo, "1" duos.</summary>
+        public string ProfileMode { get; set; } = "0";
+
         [XmlIgnore]
         public string FilePath { get; private set; }
 
