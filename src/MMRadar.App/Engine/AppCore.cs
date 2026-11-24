@@ -917,6 +917,11 @@ namespace MMRadar.Standalone
                 Height = 10,
                 IsHitTestVisible = false,
                 RenderTransform = _homeIconFlip,
+                // Axis-aligned 1px strokes land on whole pixels at full intensity,
+                // while the ✕ glyph's diagonals are anti-aliased: at the same colour
+                // the arrow carried ~1.55× the ink and looked brighter. Measured on
+                // a 1:1 render, 0.65 evens them out (hover keeps the same ratio).
+                Opacity = 0.65,
             };
             icon.Children.Add(shape);
             return icon;
