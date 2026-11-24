@@ -168,8 +168,8 @@
              (gold border + "Hide panel" while the panel is on screen). -->
         <UniformGrid Columns="2" Margin="0,0,0,8">
             <Button x:Name="PanelButton" Style="{StaticResource ThemeButton}" Click="Panel_Click"
-                    ToolTip="Outside a match: shows the panel with a demo lobby (current top-8) to place and size it">
-                <TextBlock x:Name="PanelButtonText" Text="Show panel" FontSize="11.5"/>
+                    ToolTip="A test panel filled with a demo lobby (current top-8 players) — place and size it before you play">
+                <TextBlock x:Name="PanelButtonText" Text="Show test panel" FontSize="11.5"/>
             </Button>
             <Button Style="{StaticResource ThemeButton}" Click="Reset_Click"
                     ToolTip="Moves the panel back to the top-left corner and resets its size">

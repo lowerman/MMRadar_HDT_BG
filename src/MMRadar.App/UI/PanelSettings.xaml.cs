@@ -35,7 +35,7 @@ namespace MMRadar.Standalone
         /// <summary>Reflects whether the panel is on screen right now.</summary>
         public void SetPanelShown(bool shown)
         {
-            PanelButtonText.Text = shown ? "Hide panel" : "Show panel";
+            PanelButtonText.Text = shown ? "Hide test panel" : "Show test panel";
             Mark(PanelButton, shown, Gold);
         }
 
