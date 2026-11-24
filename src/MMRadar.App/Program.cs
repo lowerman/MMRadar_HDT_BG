@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -40,7 +40,7 @@ namespace MMRadar.Standalone
             Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
 
         [STAThread]
-        public static int Main()
+        public static int Main(string[] args)
         {
             _singleInstance = new Mutex(true, "MMRadar.Standalone.SingleInstance", out var first);
             if (!first)
@@ -52,6 +52,10 @@ namespace MMRadar.Standalone
 
             SetUpLogging();
             Logger.Info($"MMRadar {Version} starting");
+            AppCore.SimulateWalliiDown = Array.Exists(args ?? new string[0],
+                a => string.Equals(a, "--simulate-wallii-down", StringComparison.OrdinalIgnoreCase));
+            if (AppCore.SimulateWalliiDown)
+                Logger.Info("TEST MODE: wallii outage simulation is ON (--simulate-wallii-down)");
 
             _app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             _app.DispatcherUnhandledException += (s, e) =>
@@ -115,12 +119,13 @@ namespace MMRadar.Standalone
             _tray = new Forms.NotifyIcon
             {
                 Icon = DrawIcon(),
-                Text = "MMRadar — waiting for Hearthstone",
+                Text = TrayText(false),
                 ContextMenuStrip = menu,
                 Visible = true,
             };
             _tray.DoubleClick += (s, e) => _core.OpenSettings();
-            _tray.ShowBalloonTip(4000, "MMRadar is running",
+            _tray.ShowBalloonTip(4000,
+                AppCore.SimulateWalliiDown ? "MMRadar is running — wallii outage simulation" : "MMRadar is running",
                 "The panel appears automatically in Battlegrounds. Right-click this icon for options.",
                 Forms.ToolTipIcon.Info);
         }
@@ -131,8 +136,13 @@ namespace MMRadar.Standalone
             if (_tray == null || connected == _lastConnected)
                 return;
             _lastConnected = connected;
-            _tray.Text = connected ? $"MMRadar {Version} — connected to Hearthstone" : "MMRadar — waiting for Hearthstone";
+            _tray.Text = TrayText(connected);
         }
+
+        /// <summary>Tray hover text (NotifyIcon caps it at 63 characters).</summary>
+        private static string TrayText(bool connected) =>
+            (connected ? $"MMRadar {Version} — connected to Hearthstone" : "MMRadar — waiting for Hearthstone") +
+            (AppCore.SimulateWalliiDown ? " [wallii down sim]" : "");
 
         private static void Exit()
         {

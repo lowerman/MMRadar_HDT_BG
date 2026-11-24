@@ -39,6 +39,15 @@ namespace MMRadar.Standalone
             _overlay = overlay;
         }
 
+        /// <summary>
+        /// Test switch (--simulate-wallii-down): every wallii request goes to a
+        /// closed local port and is refused at once, so the outage UI can be
+        /// checked at will. The official leaderboard keeps working for real.
+        /// </summary>
+        public static bool SimulateWalliiDown { get; set; }
+
+        private const string SimulatedDeadWalliiUrl = "http://127.0.0.1:9/rest/v1";
+
         /// <summary>%AppData%\MMRadar — settings, offline board copies, logs.</summary>
         public static string DataDirectory =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MMRadar");
@@ -135,7 +144,8 @@ namespace MMRadar.Standalone
             ThemeManager.Apply(_settings.Theme);
             ThemeManager.ApplyChipStyle(_settings.ChipStyle);
             _wallii = new WalliiService(
-                new WalliiApi(_settings.WalliiBaseUrl, _settings.WalliiAnonKey),
+                new WalliiApi(SimulateWalliiDown ? SimulatedDeadWalliiUrl : _settings.WalliiBaseUrl,
+                    _settings.WalliiAnonKey),
                 new OfficialBoardClient(_settings.OfficialBoardUrl, dir));
 
             _panel = new LobbyPanel { Visibility = System.Windows.Visibility.Collapsed };
@@ -620,10 +630,30 @@ namespace MMRadar.Standalone
                 live = false;
             }
 
+            // Simulation: preview exactly what an outage looks like in a match —
+            // official ratings only, the compact outage state, no avg column.
+            string outage = null;
+            if (SimulateWalliiDown)
+            {
+                foreach (var s in lobby)
+                {
+                    if (s.OnLeaderboard)
+                    {
+                        s.FallbackRating = s.Rating;
+                        s.FallbackRank = s.Rank;
+                    }
+                    s.OnLeaderboard = false;
+                    s.IsLive = false;
+                }
+                outage = "Simulated wallii.gg outage — showing official leaderboard ratings only.";
+                status = "PREVIEW — wallii outage simulation";
+            }
+
             RunOnUi(() =>
             {
                 if (generation != _previewGeneration || !_previewActive)
                     return;
+                _panel.SetWalliiUnavailable(outage);
                 _panel.SetStats(lobby);
                 _panel.SetStatus(status);
                 if (live)
