@@ -60,6 +60,16 @@ namespace MMRadar.Hs
                 return null;
 
             var named = s.Players.Where(p => !string.IsNullOrWhiteSpace(p.Name)).ToList();
+            if (named.Count > 8)
+            {
+                // More names than a lobby can hold: a non-contestant (the tavern)
+                // slipped into the name map. Only the leaderboard tiles are
+                // authoritative then — wait for them rather than show a stray row.
+                var fromTiles = named.Where(p => p.FromTile).ToList();
+                if (fromTiles.Count < 8)
+                    return null;
+                named = fromTiles;
+            }
             var needed = s.IsFriendly ? 2 : 8;
             if (named.Count < needed)
                 return null;

@@ -20,6 +20,9 @@ namespace MMRadar.Hs
         public int Place { get; set; }
         /// <summary>1-based duos team (leaderboard team index); 0 in solo.</summary>
         public int TeamId { get; set; }
+        /// <summary>False while the player is known only by name (no leaderboard
+        /// tile yet — hero select).</summary>
+        public bool FromTile { get; set; }
 
         public bool IsDead => Health > 0 && Damage >= Health;
     }
@@ -169,11 +172,13 @@ namespace MMRadar.Hs
         private void LogChange(GameSnapshot s)
         {
             var named = s.Players.Count(p => !string.IsNullOrWhiteSpace(p.Name));
+            var tiles = s.Players.Count(p => p.FromTile);
             var dead = s.Players.Count(p => p.IsDead);
             var line = !s.Connected
                 ? "not connected"
                 : $"scene={s.Scene} gameType={s.GameType} region={s.Region ?? "?"} " +
-                  $"you={(s.LocalBattleTag != null ? "known" : "?")} tiles={s.Players.Count} named={named} dead={dead}";
+                  $"you={(s.LocalBattleTag != null ? "known" : "?")} players={s.Players.Count} " +
+                  $"tiles={tiles} named={named} dead={dead}";
             if (line == _lastLogged)
                 return;
             _lastLogged = line;
@@ -278,36 +283,38 @@ namespace MMRadar.Hs
         private List<BgPlayer> ReadPlayers(bool duos)
         {
             var result = new List<BgPlayer>();
-            var manager = Try(() => _image["PlayerLeaderboardManager"]?["s_instance"]);
-            if (manager == null)
-                return result;
+            // Names come from the game state, independent of the leaderboard UI —
+            // they can exist before the tiles do (a tile only appears once its
+            // player has picked a hero).
+            var names = ReadPlayerInfoNames();
 
             // Tiles: one flat list in solo; per-team lists in duos (the team
             // index is the team id). Field names differ across game versions.
             var tiles = new List<(dynamic Tile, int Team)>();
-            var flat = Try(() => manager["m_playerTiles"]);
-            if (flat != null)
+            var manager = Try(() => _image["PlayerLeaderboardManager"]?["s_instance"]);
+            if (manager != null)
             {
-                foreach (var t in Items(flat))
-                    tiles.Add((t, 0));
-            }
-            else
-            {
-                var teams = Try(() => manager["m_teams"]);
-                var teamIndex = 0;
-                foreach (var team in Items(teams))
+                var flat = Try(() => manager["m_playerTiles"]);
+                if (flat != null)
                 {
-                    teamIndex++;
-                    var cards = Try(() => team["m_playerLeaderboardCards"]);
-                    foreach (var t in Items(cards))
-                        tiles.Add((t, duos ? teamIndex : 0));
+                    foreach (var t in Items(flat))
+                        tiles.Add((t, 0));
+                }
+                else
+                {
+                    var teams = Try(() => manager["m_teams"]);
+                    var teamIndex = 0;
+                    foreach (var team in Items(teams))
+                    {
+                        teamIndex++;
+                        var cards = Try(() => team["m_playerLeaderboardCards"]);
+                        foreach (var t in Items(cards))
+                            tiles.Add((t, duos ? teamIndex : 0));
+                    }
                 }
             }
-            if (tiles.Count == 0)
-                return result;
 
-            var names = ReadPlayerInfoNames();
-            var lastNames = ReadLastDisplayedNames();
+            var lastNames = tiles.Count > 0 ? ReadLastDisplayedNames() : new Dictionary<int, string>();
 
             foreach (var (tile, team) in tiles)
             {
@@ -335,6 +342,7 @@ namespace MMRadar.Hs
                         Damage = SafeInt(() => entity["m_realTimeDamage"]),
                         Place = SafeInt(() => entity["m_realTimePlayerLeaderboardPlace"]),
                         TeamId = team,
+                        FromTile = true,
                     });
                 }
                 catch (Exception ex)
@@ -342,6 +350,16 @@ namespace MMRadar.Hs
                     Logger.Debug("Tile read failed: " + ex.Message);
                 }
             }
+
+            // Contestants the game already named but who have no tile yet (hero
+            // select): listed by name now, enriched by their tile later (same id).
+            foreach (var kv in names)
+            {
+                if (result.All(p => p.PlayerId != kv.Key))
+                    result.Add(new BgPlayer { PlayerId = kv.Key, Name = kv.Value });
+            }
+            // Stable order: the core pairs rows positionally within one roster.
+            result.Sort((a, b) => a.PlayerId.CompareTo(b.PlayerId));
             return result;
         }
 

@@ -224,7 +224,7 @@ namespace MMRadar.Standalone
                     _hiddenForThisGame = false;
                     _previewActive = false; // a real match replaces the sample preview
                     HideSettingsCard();     // a stray card over hero-pick hurts most
-                    _panel.ShowWaiting();
+                    ShowWaitingClean();
                     ShowPanel();
                 }
 
@@ -555,7 +555,7 @@ namespace MMRadar.Standalone
 
                 // No match running: preview with the live global top-8.
                 _previewActive = true;
-                _panel.ShowWaiting();
+                ShowWaitingClean();
                 _panel.SetStatus("PREVIEW — loading top players…");
                 ShowPanel();
                 _ = ShowTopPreviewAsync(++_previewGeneration);
@@ -772,6 +772,17 @@ namespace MMRadar.Standalone
             }
         }
 
+        /// <summary>
+        /// "Waiting for lobby" with NO leftovers: ShowWaiting alone hides the header
+        /// but keeps the previous lobby's context flag, so the next relayout (e.g. the
+        /// auto-scale in ShowPanel) brought back last game's "avg · delta" line.
+        /// An empty SetStats clears that state first.
+        /// </summary>
+        private void ShowWaitingClean()
+        {
+            _panel.SetStats(new List<PlayerSummary>());
+            _panel.ShowWaiting();
+        }
         private void HidePanel()
         {
             _popupGeneration++; // cancel any in-flight details fetch re-showing the popup
