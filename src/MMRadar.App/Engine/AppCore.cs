@@ -105,6 +105,7 @@ namespace MMRadar.Standalone
         private string _popupKey;
         // Card position when a header press began — tells a drag from a click.
         private System.Windows.Point? _popupDragFrom;
+        private Button _popupHomeButton;
         private DateTime _lastPartialLobbyRetry = DateTime.MinValue;
         private bool _spectateNoticeShown;
         private System.Windows.Threading.DispatcherTimer _saveDebounce;
@@ -175,6 +176,7 @@ namespace MMRadar.Standalone
                 _popupDragFrom = new System.Windows.Point(Canvas.GetLeft(_popup), Canvas.GetTop(_popup));
             _popup.Header.MouseLeftButtonUp += (s, e) => RememberPopupPosition();
             _popup.Header.LostMouseCapture += (s, e) => RememberPopupPosition();
+            AddPopupHomeButton();
 
             // Attach to the overlay last so a failure above cannot orphan the controls.
             _overlay.Surface.Children.Add(_panel);
@@ -727,12 +729,6 @@ namespace MMRadar.Standalone
 
         public void ResetPosition()
         {
-            // The details card goes back to its default spot next to the panel too.
-            _appSettings.PopupLeftFraction = null;
-            _appSettings.PopupTopFraction = null;
-            _appSettings.Save();
-            if (_popup.Visibility == System.Windows.Visibility.Visible)
-                PositionPopupNextToPanel();
             Canvas.SetLeft(_panel, 40);
             Canvas.SetTop(_panel, 130);
             _settings.PanelLeft = 40;
@@ -748,6 +744,8 @@ namespace MMRadar.Standalone
             ShowPanel(); // re-applies the auto scale when the overlay has a real size
             if (_settingsCard.Visibility == System.Windows.Visibility.Visible)
                 PositionCardNextToPanel(_settingsCard, 292); // follow the panel home
+            // The details card goes back to its default spot next to the panel too.
+            ResetPopupPosition();
         }
 
         private void ResetToIdle()
@@ -852,6 +850,59 @@ namespace MMRadar.Standalone
             return true;
         }
 
+        /// <summary>
+        /// A "back to its spot" button left of the card's ✕, injected here rather
+        /// than in the shared XAML so the plugin stays untouched. Shown only while
+        /// the card sits at a user-chosen position — otherwise it would do nothing.
+        /// </summary>
+        private void AddPopupHomeButton()
+        {
+            try
+            {
+                var grid = _popup.CloseButton.Parent as Grid;
+                if (grid == null)
+                    return;
+                grid.ColumnDefinitions.Insert(1, new ColumnDefinition { Width = System.Windows.GridLength.Auto });
+                Grid.SetColumn(_popup.CloseButton, 2);
+                _popupHomeButton = new Button
+                {
+                    Style = _popup.CloseButton.Style,
+                    Content = "↺",
+                    FontFamily = new System.Windows.Media.FontFamily("Segoe UI Symbol, Segoe UI"),
+                    VerticalAlignment = System.Windows.VerticalAlignment.Top,
+                    Margin = new System.Windows.Thickness(0, 0, 2, 0),
+                    ToolTip = "Move back next to the panel",
+                };
+                _popupHomeButton.Click += (s, e) => ResetPopupPosition();
+                Grid.SetColumn(_popupHomeButton, 1);
+                grid.Children.Add(_popupHomeButton);
+                UpdatePopupHomeButton();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AddPopupHomeButton failed", ex);
+            }
+        }
+
+        private void UpdatePopupHomeButton()
+        {
+            if (_popupHomeButton == null)
+                return;
+            _popupHomeButton.Visibility = _appSettings.PopupLeftFraction != null
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
+        }
+
+        private void ResetPopupPosition()
+        {
+            _appSettings.PopupLeftFraction = null;
+            _appSettings.PopupTopFraction = null;
+            _appSettings.Save();
+            UpdatePopupHomeButton();
+            if (_popup.Visibility == System.Windows.Visibility.Visible)
+                PositionPopupNextToPanel();
+        }
+
         private void RememberPopupPosition()
         {
             try
@@ -872,6 +923,7 @@ namespace MMRadar.Standalone
                 _appSettings.PopupLeftFraction = left / w;
                 _appSettings.PopupTopFraction = top / h;
                 _appSettings.Save();
+                UpdatePopupHomeButton();
             }
             catch (Exception ex)
             {
