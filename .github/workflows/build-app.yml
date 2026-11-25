@@ -1,0 +1,92 @@
+# Builds the standalone app (MMRadar.exe) from source.
+# - push to main / manual run: build check, unsigned zip as a workflow artifact.
+# - tag vX.Y.Z (X.Y >= 1.1): the same, plus SignPath signing once the
+#   SIGNPATH_* settings exist, plus a DRAFT release with the zip attached.
+#   The release is published by hand after reviewing it.
+#
+# SignPath settings (repository Settings -> Secrets and variables -> Actions):
+#   secret   SIGNPATH_API_TOKEN
+#   variable SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG
+name: Build app
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          [xml]$p = Get-Content src/MMRadar.App/MMRadar.App.csproj
+          $v = ($p.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
+          "version=$v" >> $env:GITHUB_OUTPUT
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$v") {
+            throw "Tag $env:GITHUB_REF_NAME does not match the app version $v in MMRadar.App.csproj"
+          }
+
+      - name: Build
+        shell: pwsh
+        run: ./tools/build-app.ps1 -Zip
+
+      - name: Upload unsigned files
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: MMRadar-v${{ steps.ver.outputs.version }}-unsigned
+          path: src/MMRadar.App/bin/Release/package/
+          if-no-files-found: error
+
+      - name: Sign with SignPath
+        if: ${{ github.ref_type == 'tag' && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          # every signing request is approved by hand in SignPath
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed
+
+      - name: Package release zip
+        id: zip
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $src = if (Test-Path signed) { 'signed' } else { 'src/MMRadar.App/bin/Release/package' }
+          $zip = "MMRadar-v$v.zip"
+          Compress-Archive -Path "$src/*" -DestinationPath $zip
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+          "signed=$(Test-Path signed)" >> $env:GITHUB_OUTPUT
+          "SHA-256 $zip : $((Get-FileHash $zip -Algorithm SHA256).Hash)" | Tee-Object -Append $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload release zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: MMRadar-v${{ steps.ver.outputs.version }}
+          path: ${{ steps.zip.outputs.zip }}
+          if-no-files-found: error
+
+      - name: Draft release
+        if: ${{ github.ref_type == 'tag' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME '${{ steps.zip.outputs.zip }}' --draft `
+            --title "MMRadar $env:GITHUB_REF_NAME" `
+            --notes "Draft created by CI (signed: ${{ steps.zip.outputs.signed }}). Replace with the release notes before publishing."

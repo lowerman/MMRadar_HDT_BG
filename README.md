@@ -23,6 +23,7 @@ A small Windows app for **Hearthstone Battlegrounds** that puts your whole lobby
 1. Download `MMRadar-v<version>.zip` from [Releases](../../releases/latest).
 2. **Extract** it into any folder (for example `Documents\MMRadar`). Do not run it from inside the zip.
 3. Run `MMRadar.exe`. The first time, Windows may show "Windows protected your PC" because the app is not code-signed: click **More info**, then **Run anyway**.
+   To skip that warning, unblock the download first: right-click the zip → **Properties** → check **Unblock** → **OK**, then extract it.
 4. MMRadar lives in the **system tray**, next to the clock. If Windows hides the icon behind **^**, drag it onto the taskbar. Click the icon to open MMRadar.
 5. Click **Show test panel** to place and size the panel, then start Hearthstone. The panel appears by itself in every Battlegrounds match.
 
@@ -97,6 +98,10 @@ tools\deploy.ps1    # build + copy the DLL into HDT's Plugins folder
 - **[Hearthstone Deck Tracker](https://github.com/HearthSim/Hearthstone-Deck-Tracker)** by HearthSim.
 
 Not affiliated with Blizzard Entertainment. Hearthstone is a trademark of Blizzard Entertainment, Inc.
+
+## Code signing policy
+
+See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md): how the app is built and signed, team roles, and the privacy policy.
 
 ## License
 

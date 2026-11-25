@@ -12,6 +12,8 @@ Getting started
 2. Run MMRadar.exe.
    Windows may show "Windows protected your PC" because the app is not signed:
    click "More info", then "Run anyway".
+   To avoid the warning: right-click MMRadar.exe -> Properties -> check
+   "Unblock" -> OK (or do the same with the zip before extracting it).
 3. MMRadar lives in the system tray, next to the clock. If Windows hides the
    icon behind ^, drag it onto the taskbar. Click the icon to open settings.
 4. In settings, click "Show test panel" to place and size the panel before
