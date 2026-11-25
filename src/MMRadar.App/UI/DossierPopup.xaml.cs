@@ -30,7 +30,10 @@ namespace MMRadar.Standalone
             get => _layoutScale;
             set
             {
-                var clamped = Math.Max(0.5, Math.Min(value, 2.0));
+                // Wheel steps of 0.1 accumulate float error (0.7 + 0.1 + 0.1 + 0.1 =
+                // 0.9999999999999999), and the whole-pixel rounding below then drops
+                // 13.5 px chip text to 13 px. Snap the zoom to two decimals first.
+                var clamped = Math.Round(Math.Max(0.5, Math.Min(value, 2.0)), 2);
                 if (Math.Abs(clamped - _layoutScale) < 0.001)
                     return;
                 _layoutScale = clamped;
