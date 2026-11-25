@@ -1,78 +1,99 @@
 # MMRadar
 
-A [Hearthstone Deck Tracker](https://hsreplay.net/downloads/) plugin for **Battlegrounds** that puts your whole lobby on the radar: it shows the leaderboard rating and average placement of every player at the table, and one click opens a full dossier on any of them — recent games, MMR trajectory, and current form, powered by [wallii.gg](https://www.wallii.gg/).
+A small Windows app for **Hearthstone Battlegrounds** that puts your whole lobby on the radar. It shows the leaderboard rating and average placement of every player at the table, and one click opens a full dossier on any of them: recent games, MMR trajectory and current form, powered by [wallii.gg](https://www.wallii.gg/).
+
+**No Hearthstone Deck Tracker needed.** MMRadar runs on its own from the system tray and draws its panel over the game. It started as an HDT plugin, and the plugin is still available (see [HDT plugin](#hdt-plugin)).
 
 ![MMRadar overlay](artifacts/screenshot-main.png)
 
 ## Features
 
-- 🏆 **Lobby overview** — every player's rating and a color-coded **7-day average placement**, sorted by rating in either direction (highest or lowest on top, BGRank-style — your pick). The header shows the **lobby average and your delta** to it; streamers get a live dot, dead players grey out as the game goes on.
-- 📈 **The whole ladder covered** — wallii-tracked top players get full stats; everyone else on the official leaderboard still shows their rating (and a computed rank in the tooltip); confirmed sub-cutoff players show **<8 000**.
-- 🔍 **Player dossier on click** — recent games (estimated placement, MMR delta, resulting MMR), averages over the last ~10 games / today / last 7 days (all computed from the same data, so they never contradict each other), and an MMR trajectory chart aligned with the game list.
-- 🔤 **HUD-grade readability** — big high-contrast type with strictly tabular digits, an auto-width card that hugs its content, and resolution-aware scaling (1080p ×1.0, 1440p ×1.2, 4K ×1.6). Zooming re-renders the text, so it stays crisp at any size.
-- 🎨 **Three themes, three avg color styles** — themes: **HDT** (neutral grey matching the deck tracker — default), **Dark** (solid near-black, maximum contrast), **Warm** (blends with Hearthstone's look). The avg column has its own style switch: **Classic** bright chips, **Tint** (quiet translucent chips in a diverging palette built from the panel's own green/red — average results stay neutral), or **Text** (no chips, colored numbers only). Everything switches instantly in Settings.
-- ⚙️ **Settings that respect the game** — the gear in the panel header opens a settings card **right on the overlay**, next to the panel: the game never loses focus, nothing pops up mid-screen, and the card hides itself when a match starts or ends.
-- 🤝 **Duos support** — teammates are grouped into pairs (alternating background bands, teams sorted by their strongest member) once the game reveals the teams; ratings, dossiers and the lobby average work in duos too.
-- 👁 **Spectate support** — spectating a ranked game shows the full lobby automatically; in private lobbies, hover the leaderboard portraits and the panel fills in player by player (dead-marking and duos bands are limited there — the game reveals only names to a spectator).
-- 🫥 **Stays out of your way** — collapse the panel into a tiny ~30%-opacity pill <img src="artifacts/screenshot-collapsed.png" alt="collapsed pill" height="22">; click the pill to expand, drag to move. Position, scale, and collapsed state persist.
-- 🧪 **Live preview** — show the overlay with the current world top-8 (real wallii data) to position and scale it without starting a game.
+- 🏆 **Lobby overview**: every player's rating and a color-coded **7-day average placement**, sorted by rating in either direction (highest or lowest on top). The header shows the **lobby average and your delta** to it; streamers get a live dot, and players who are out of the game grey out.
+- 📈 **The whole ladder covered**: wallii-tracked top players get full stats; everyone else on the official leaderboard still shows their rating; confirmed sub-cutoff players show **<8 000**.
+- 🔍 **Player dossier on click**: the **last 30 games** (estimated placement, MMR delta, resulting MMR) in a slim scrolling list, averages over those games / today / the last 7 days, and an MMR chart over the same games.
+- 🔤 **Readable at a glance**: big high-contrast type with tabular digits, a card that hugs its content, and automatic scaling to the game's resolution that also accounts for Windows display scaling. The mouse wheel over the header zooms, and the text stays crisp at any size.
+- 🎨 **Themes and avg colors**: **Dark**, **Neutral** (default) and **Warm** themes; the avg column can be **Classic** bright chips, **Tint** quiet chips, or plain colored **Text**.
+- 🤝 **Duos and spectating**: teammates are grouped into pairs, and spectated games show the full lobby.
+- 🫥 **Stays out of your way**: collapse the panel into a small, dim pill that is still easy to find; the panel appears only in Battlegrounds and hides with the game.
+- 🧪 **Test panel**: show a demo lobby (the current world top 8) to place and size the panel before you play.
+- 🔄 **Updates in one click**: MMRadar checks GitHub for new versions, verifies the download and restarts itself, keeping your settings.
 
 ## Install
 
-1. Download `MMRadar.dll` from [Releases](../../releases) (or build it — see below) and drop it into:
-   `%AppData%\HearthstoneDeckTracker\Plugins`
-2. Restart Hearthstone Deck Tracker.
-3. Enable the plugin: **Options → Tracker → Plugins → MMRadar**.
+1. Download `MMRadar-v<version>.zip` from [Releases](../../releases/latest).
+2. **Extract** it into any folder (for example `Documents\MMRadar`). Do not run it from inside the zip.
+3. Run `MMRadar.exe`. The first time, Windows may show "Windows protected your PC" because the app is not code-signed: click **More info**, then **Run anyway**.
+4. MMRadar lives in the **system tray**, next to the clock. If Windows hides the icon behind **^**, drag it onto the taskbar. Click the icon to open MMRadar.
+5. Click **Show test panel** to place and size the panel, then start Hearthstone. The panel appears by itself in every Battlegrounds match.
 
-Requirements: Windows, Hearthstone Deck Tracker (the plugin resolves its assemblies from the HDT install), .NET Framework 4.7.2 (ships with HDT).
+Requirements: Windows 10 or 11 (64-bit), .NET Framework 4.8 (built into Windows 10 1903+ and Windows 11).
 
-> If Windows blocks the downloaded DLL, right-click it → Properties → check **Unblock**.
+### Moving from the HDT plugin
+
+Remove `MMRadar.dll` from `%AppData%\HearthstoneDeckTracker\Plugins` (or disable the plugin in HDT), otherwise you will see two panels. On its first run the app copies the plugin's settings (position, scale, theme, colors), so the panel shows up where it was.
 
 ## Usage
 
-- The panel appears automatically at the start of a Battlegrounds match, as soon as the game reports the lobby roster.
-- **Click a player row** to open their recent-games popup. Click another row to switch, or ✕ to close it.
-- **⚙ in the panel header** toggles the settings card beside the panel: theme picker, sort direction, position/scale reset, and a live preview for positioning. The same settings open as a regular dialog from Options → Tracker → Plugins → MMRadar → Settings.
-- **Plugins → MMRadar** in the HDT menu is a plain on/off checkbox, like other plugins.
-- **–** collapses the panel into a small semi-transparent pill; clicking the pill expands it back, dragging moves it. The mouse wheel over the header zooms the whole overlay.
+- **Click a player row** to open their dossier. Click another row to switch, or ✕ to close it. Drag the dossier by its header to move it.
+- **⚙ in the panel header** opens the settings right on the overlay, so the game never loses focus. The same settings are in the MMRadar window (tray icon).
+- **–** collapses the panel into a pill; click the pill to expand it, drag to move it. The mouse wheel over the header zooms the panel; **Reset position** brings back the default spot and automatic size.
+- The **tray menu** opens the window, shows or hides the panel, turns the overlay off, and exits the app. Closing the window keeps MMRadar running in the tray.
+- The window also has **Start with Windows** and **Check for updates automatically**.
+
+## Troubleshooting
+
+- **"Hearthstone is running as administrator"**: MMRadar cannot read a game started with elevated rights. Start Hearthstone (and Battle.net) normally.
+- **"Can't read this Hearthstone version"**: a game patch changed something MMRadar relies on. Check for an update in the MMRadar window; a fix usually follows the patch.
+- **Antivirus warning**: MMRadar reads the game's memory to find the players in your lobby, which some antivirus tools flag. It only reads, never writes, and goes online only to look up players and to check GitHub for updates.
+- Settings and logs live in `%AppData%\MMRadar` (the **Data folder** link in the window opens it).
+
+### Uninstall
+
+Uncheck **Start with Windows**, choose **Exit** in the tray menu, then delete the folder. To remove the settings too, delete `%AppData%\MMRadar`.
 
 ## How it works
 
-- **Lobby names** come from HDT's own memory mirror (`BattlegroundsLobbyInfo` via HearthMirror), with a Power.log fallback (`PlayerID=…, PlayerName=…` lines) — no portrait-hovering needed in your own games. Spectated private lobbies are the one exception: there the game reveals a name only when a portrait is hovered, so the panel reads the leaderboard tiles via the `untapped-scry` reader **that ships with HDT itself** (the technique HDT_BGrank pioneered) — still a single-DLL install.
-- **Stats** come from wallii.gg's public Supabase REST API — the same backend their website queries from the browser. wallii tracks the very top of the ladder, so detailed dossiers (recent games, averages) are available for those players.
-- **Ratings for everyone else** come from the full official leaderboard via [BGrank's public mirror](https://github.com/IBM5100o/BGrank_bot) (one cached request per region, 15-min TTL, in-game retries, offline fallback) — with an automatic fallback to a [GitHub-hosted mirror](https://github.com/lowerman/bg-board-mirror) on networks where `fly.dev` is throttled or unreachable. When both wallii and the official board know a player, **the official board wins** for the displayed rating (wallii can lag days behind for players who slipped out of its tracked top; when the board data itself is older than wallii's latest observation of that player, the freshest source wins), names are matched **case-exactly** ("Pacific" and "pacific" are different people), and when the official rating clearly cannot belong to the wallii identity, that namesake's stats are hidden rather than misattributed. Honest limitations:
+- **Lobby players** come straight from the game: MMRadar reads Hearthstone's own memory (read-only) with a vendored copy of [UnitySpy](https://github.com/hackf5/unityspy) (MIT), the same technique deck trackers use. Nothing is injected into the game.
+- **Stats** come from wallii.gg's public Supabase REST API, the same backend their website queries from the browser. wallii tracks the very top of the ladder, so detailed dossiers are available for those players.
+- **Ratings for everyone else** come from the full official leaderboard via [BGrank's public mirror](https://github.com/IBM5100o/BGrank_bot) (one cached request per region), with a fallback to a [GitHub-hosted mirror](https://github.com/lowerman/bg-board-mirror). When both sources know a player, the fresher official rating wins, and names are matched case-exactly. Honest limitations:
   - players **below the official cutoff** (roughly 8000 MMR) show as "<8 000" and count toward the lobby average as 8 000;
   - per-game **placements are estimates** inferred from MMR changes (wallii's published formula), not exact Blizzard data.
-- Requests are batched (2–3 per lobby) and cached for 5 minutes to keep the load on wallii minimal. The plugin never scrapes the wallii website itself.
+- Requests are batched and cached to keep the load on wallii minimal. MMRadar never scrapes the wallii website.
 
-If wallii ever rotates their public API key, override it in
-`%AppData%\HearthstoneDeckTracker\MMRadar\settings.xml` (`WalliiBaseUrl`, `WalliiAnonKey`).
+If wallii ever rotates their public API key, override it in `%AppData%\MMRadar\settings.xml` (`WalliiBaseUrl`, `WalliiAnonKey`).
+
+## HDT plugin
+
+MMRadar started as a [Hearthstone Deck Tracker](https://hsreplay.net/downloads/) plugin, and it still works for people who prefer HDT. The last plugin release is **[v1.0.10](../../releases/tag/v1.0.10)**:
+
+1. Download `MMRadar-v1.0.10.zip` and put the `MMRadar.dll` from it into `%AppData%\HearthstoneDeckTracker\Plugins`.
+2. Restart HDT and enable the plugin: **Options → Tracker → Plugins → MMRadar**.
+
+If Windows blocks the DLL, right-click it → Properties → check **Unblock**. Use either the plugin or the app, not both at once.
 
 ## Building from source
 
-Prerequisites: [.NET SDK](https://dotnet.microsoft.com/download) 6+ and an installed Hearthstone Deck Tracker.
+Prerequisites: [.NET SDK](https://dotnet.microsoft.com/download) 6+.
 
 ```powershell
-tools\build.ps1     # auto-detects your HDT install for assembly references
-# or explicitly:
-dotnet build MMRadar.sln -c Release -p:HdtDir="$env:LOCALAPPDATA\HearthstoneDeckTracker\app-<version>"
+tools\build-app.ps1         # the app: src\MMRadar.App\bin\Release\MMRadar.exe
+tools\build-app.ps1 -Zip    # plus the release zip
+```
 
+The plugin needs an installed Hearthstone Deck Tracker for its assembly references:
+
+```powershell
+tools\build.ps1     # auto-detects your HDT install
 tools\deploy.ps1    # build + copy the DLL into HDT's Plugins folder
 ```
 
-`src/MMRadar.Harness` is a standalone WPF test bed that renders the overlay without HDT or Hearthstone:
-
-```powershell
-MMRadar.Harness.exe                                   # sample lobby
-MMRadar.Harness.exe --top                             # live world top-8
-MMRadar.Harness.exe --live name1,name2 --region EU    # specific players
-MMRadar.Harness.exe --theme hdt --shot out.png        # screenshot a theme
-```
+`src/MMRadar.Harness` is a WPF test bed that renders the plugin's overlay without HDT or Hearthstone (`--top` for the live world top 8, `--live name1,name2 --region EU` for specific players, `--shot out.png` for a screenshot).
 
 ## Credits
 
-- **[wallii.gg](https://www.wallii.gg/)** by JimLiu0 & the Wall_Lii team ([wall-lii-app](https://github.com/JimLiu0/wall-lii-app), [Wall_Lii](https://github.com/HS-Tools/Wall_Lii)) — leaderboard data and the placement-estimation formula this plugin re-implements. MMRadar is an unofficial community project and is not affiliated with wallii.
-- **[HDT_BGrank](https://github.com/IBM5100o/HDT_BGrank)** by IBM5100 — the original "opponent MMR overlay" idea, and the [BGrank_bot](https://github.com/IBM5100o/BGrank_bot) full-leaderboard mirror this plugin uses for sub-top ratings.
+- **[wallii.gg](https://www.wallii.gg/)** by JimLiu0 & the Wall_Lii team ([wall-lii-app](https://github.com/JimLiu0/wall-lii-app), [Wall_Lii](https://github.com/HS-Tools/Wall_Lii)): leaderboard data and the placement-estimation formula MMRadar re-implements. MMRadar is an unofficial community project and is not affiliated with wallii.
+- **[HDT_BGrank](https://github.com/IBM5100o/HDT_BGrank)** by IBM5100: the original "opponent MMR overlay" idea, and the [BGrank_bot](https://github.com/IBM5100o/BGrank_bot) full-leaderboard mirror used for sub-top ratings.
+- **[UnitySpy](https://github.com/hackf5/unityspy)** by brian t (MIT), via the [Zero-to-Heroes .NET Framework port](https://github.com/Zero-to-Heroes/unity-spy-.net4.5): the Unity memory reader the app is built on.
 - **[Hearthstone Deck Tracker](https://github.com/HearthSim/Hearthstone-Deck-Tracker)** by HearthSim.
 
 Not affiliated with Blizzard Entertainment. Hearthstone is a trademark of Blizzard Entertainment, Inc.
