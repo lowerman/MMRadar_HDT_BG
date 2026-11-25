@@ -58,7 +58,7 @@
                     MouseLeave="Header_MouseLeave"
                     LostMouseCapture="Header_LostMouseCapture"
                     MouseWheel="Header_MouseWheel">
-                <DockPanel Margin="8,5,4,4" LastChildFill="False">
+                <DockPanel Margin="11,6,5,5" LastChildFill="False">
                     <StackPanel x:Name="TitleBlock" Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                         <TextBlock Text="MMR" FontSize="{DynamicResource TitleFontSize}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextSecondary}"/>
@@ -98,13 +98,13 @@
             <!-- Body -->
             <StackPanel x:Name="Body">
                 <TextBlock x:Name="StatusText"
-                           Margin="8,6,8,6"
+                           Margin="11,7,11,7"
                            FontSize="{DynamicResource StatusFontSize}"
                            Foreground="{DynamicResource TextSecondary}"
                            Text="Waiting for lobby…"
                            Visibility="Collapsed"/>
 
-                <ItemsControl x:Name="RowsControl" Margin="0,2" Grid.IsSharedSizeScope="True">
+                <ItemsControl x:Name="RowsControl" Margin="0,3" Grid.IsSharedSizeScope="True">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Style="{StaticResource RowButton}"
@@ -115,7 +115,7 @@
                                     Background="{Binding RowBackground}">
                                 <!-- HUD typography; shared-size columns keep every row
                                      aligned while the panel hugs its content. -->
-                                <Grid Margin="4,0,2,0" Height="{DynamicResource RowHeight}">
+                                <Grid Margin="7,0,5,0" Height="{DynamicResource RowHeight}">
                                     <Grid.ColumnDefinitions>
                                         <!-- Star column: when the HEADER is the widest
                                              element (long avg text), rows stretch to the
