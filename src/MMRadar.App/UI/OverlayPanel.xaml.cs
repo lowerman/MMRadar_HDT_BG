@@ -76,9 +76,9 @@ namespace MMRadar.Standalone
             Resources["HeaderBtnSize"] = R(18.0 * k);
             Resources["HeaderBtnFont"] = R(10.0 * k);
             Resources["HeaderGearFont"] = R(11.0 * k);
-            // The 52 px column is sized for a chip; bare digits need far less, so
-            // the "Text" style gets a narrow column instead of an empty strip.
-            var chipCol = ThemeManager.ChipStyle == "bare" ? 34.0 : 52.0;
+            // Chips hug their two-decimal value (the plugin keeps a roomier 52 px);
+            // bare digits ("Text" style) need no chip padding at all.
+            var chipCol = ThemeManager.ChipStyle == "bare" ? 34.0 : 40.0;
             Resources["ChipColWidth"] = new GridLength(_walliiDownReason != null ? 0 : R(chipCol * k));
             RootBorder.MinWidth = _collapsed ? 0 : R(192.0 * k);
         }
