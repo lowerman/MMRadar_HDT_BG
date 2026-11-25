@@ -21,7 +21,7 @@
     <AssemblyName>MMRadar</AssemblyName>
     <RootNamespace>MMRadar</RootNamespace>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Company>MMRadar</Company>
     <Product>MMRadar</Product>
     <Description>Battlegrounds lobby overlay: opponents' ratings and average placement</Description>
