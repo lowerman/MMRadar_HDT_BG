@@ -37,7 +37,6 @@ namespace MMRadar.Standalone
         private static AppWindow _window;
         private static Forms.NotifyIcon _tray;
         private static Forms.ToolStripMenuItem _enabledItem;
-        private static bool _lastConnected;
         private static readonly object LogLock = new object();
         private static string _logPath;
 
@@ -54,6 +53,8 @@ namespace MMRadar.Standalone
         public static int Main(string[] args)
         {
             args = args ?? new string[0];
+            if (RunningFromArchive())
+                return 1;
             _justUpdated = HasArg(args, "--updated");
             _autostart = HasArg(args, AutostartArg);
 
@@ -110,12 +111,45 @@ namespace MMRadar.Standalone
             return _app.Run();
         }
 
+        /// <summary>
+        /// Double-clicking MMRadar.exe inside the downloaded zip makes Windows (or
+        /// 7-Zip / WinRAR) unpack just the exe into a temp folder: the libraries
+        /// next to it are missing, and autostart or updates would point at a folder
+        /// that gets wiped. Say so plainly instead of failing later in odd ways.
+        /// </summary>
+        private static bool RunningFromArchive()
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+                var temp = Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\') + "\\";
+                var inTemp = (Path.GetFullPath(dir).TrimEnd('\\') + "\\")
+                    .StartsWith(temp, StringComparison.OrdinalIgnoreCase);
+                var libsMissing = !File.Exists(Path.Combine(dir, "Newtonsoft.Json.dll"));
+                if (!inTemp && !libsMissing)
+                    return false;
+                Forms.MessageBox.Show(
+                    "MMRadar is running straight from the zip file, so some of its files are missing.\n\n" +
+                    "Extract the whole zip first (right-click it → Extract All…) into a folder you keep, " +
+                    "for example Documents\\MMRadar, then start MMRadar.exe from there.",
+                    "MMRadar — extract the zip first",
+                    Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Warning);
+                return true;
+            }
+            catch
+            {
+                return false; // never block a normal start on a failed check
+            }
+        }
+
         private static bool HasArg(string[] args, string name) =>
             Array.Exists(args, a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
 
         private static void Start()
         {
             _reader = new HearthstoneReader();
+            _reader.HealthChanged += h =>
+                _app.Dispatcher.BeginInvoke(new Action(() => OnReaderHealthChanged(h)));
             _reader.Start();
             _tracker = new GameTracker(_reader);
 
@@ -136,6 +170,7 @@ namespace MMRadar.Standalone
             tick.Start();
 
             BuildTray();
+            OnReaderHealthChanged(_reader.Health); // anything the reader saw before the tray existed
             ListenForShowRequests();
             // Refresh an existing autostart entry: older builds wrote it without the
             // quiet-start flag, and the exe may have moved since.
@@ -210,7 +245,31 @@ namespace MMRadar.Standalone
             var snap = _reader.Latest;
             string title, detail;
             var ok = snap.Connected;
-            if (!snap.Connected)
+            var warning = false;
+            var health = _reader.Health;
+            if (health == ReaderHealth.AccessDenied)
+            {
+                title = "Hearthstone is running as administrator";
+                detail = "Windows won't let MMRadar read the game. Start Battle.net without administrator " +
+                         "rights, or run MMRadar as administrator too (right-click MMRadar.exe).";
+                ok = false;
+                warning = true;
+            }
+            else if (health == ReaderHealth.Unsupported)
+            {
+                title = "Can't read this Hearthstone version";
+                detail = "Hearthstone was probably updated in a way MMRadar doesn't understand yet. " +
+                         "Check for updates below — a fix usually follows within days.";
+                ok = false;
+                warning = true;
+            }
+            else if (health == ReaderHealth.Starting)
+            {
+                title = "Hearthstone is starting…";
+                detail = "MMRadar connects as soon as the game has loaded.";
+                ok = false;
+            }
+            else if (!snap.Connected)
             {
                 title = "Waiting for Hearthstone";
                 detail = "Start the game — MMRadar connects to it on its own.";
@@ -230,7 +289,7 @@ namespace MMRadar.Standalone
             }
             if (AppCore.SimulateWalliiDown)
                 detail += "\nTest mode: wallii outage simulation is on.";
-            _window.SetStatus(title, detail, ok);
+            _window.SetStatus(title, detail, ok, warning);
         }
 
         /// <summary>A second launch signals this event instead of starting twice.</summary>
@@ -280,7 +339,7 @@ namespace MMRadar.Standalone
             _tray = new Forms.NotifyIcon
             {
                 Icon = DrawIcon(),
-                Text = TrayText(false),
+                Text = TrayText(ReaderHealth.NoGame, false),
                 ContextMenuStrip = menu,
                 Visible = true,
             };
@@ -294,17 +353,66 @@ namespace MMRadar.Standalone
 
         private static void UpdateTrayStatus()
         {
-            var connected = _tracker.HearthstoneRunning;
-            if (_tray == null || connected == _lastConnected)
+            if (_tray == null)
                 return;
-            _lastConnected = connected;
-            _tray.Text = TrayText(connected);
+            var text = TrayText(_reader.Health, _tracker.HearthstoneRunning);
+            if (text == _lastTrayText)
+                return;
+            _lastTrayText = text;
+            _tray.Text = text;
         }
 
-        /// <summary>Tray hover text (NotifyIcon caps it at 63 characters).</summary>
-        private static string TrayText(bool connected) =>
-            (connected ? $"MMRadar {Version} — connected to Hearthstone" : "MMRadar — waiting for Hearthstone") +
-            (AppCore.SimulateWalliiDown ? " [wallii down sim]" : "");
+        private static string _lastTrayText;
+
+        /// <summary>Tray hover text (NotifyIcon refuses more than 63 characters).</summary>
+        private static string TrayText(ReaderHealth health, bool connected)
+        {
+            string text;
+            switch (health)
+            {
+                case ReaderHealth.AccessDenied: text = "MMRadar — Hearthstone runs as administrator"; break;
+                case ReaderHealth.Unsupported: text = "MMRadar — can't read this Hearthstone version"; break;
+                case ReaderHealth.Starting: text = "MMRadar — Hearthstone is starting"; break;
+                default:
+                    text = connected ? $"MMRadar {Version} — connected to Hearthstone" : "MMRadar — waiting for Hearthstone";
+                    break;
+            }
+            if (AppCore.SimulateWalliiDown)
+                text += " [wallii down sim]";
+            return text.Length > 63 ? text.Substring(0, 63) : text;
+        }
+
+        private static ReaderHealth? _announcedHealth;
+        private static bool _updateCheckedForUnsupported;
+
+        /// <summary>
+        /// A problem the user has to act on gets one tray notification — the
+        /// window may well be closed — plus, for an unreadable game version, an
+        /// immediate update check (the fix may already be out).
+        /// </summary>
+        private static void OnReaderHealthChanged(ReaderHealth health)
+        {
+            UpdateTrayStatus();
+            if (health != ReaderHealth.AccessDenied && health != ReaderHealth.Unsupported)
+                return;
+            if (_announcedHealth != health && _tray != null)
+            {
+                _announcedHealth = health;
+                if (health == ReaderHealth.AccessDenied)
+                    _tray.ShowBalloonTip(8000, "Hearthstone is running as administrator",
+                        "MMRadar can't read the game. Start Battle.net normally, or run MMRadar as administrator too.",
+                        Forms.ToolTipIcon.Warning);
+                else
+                    _tray.ShowBalloonTip(8000, "MMRadar can't read this Hearthstone version",
+                        "The game was probably updated. Click here to check for a MMRadar update.",
+                        Forms.ToolTipIcon.Warning);
+            }
+            if (health == ReaderHealth.Unsupported && !_updateCheckedForUnsupported)
+            {
+                _updateCheckedForUnsupported = true;
+                _ = CheckForUpdatesAsync(manual: false);
+            }
+        }
 
         // --- updates ---
 

@@ -171,6 +171,7 @@ namespace MMRadar.Standalone
 
             Canvas.SetLeft(_panel, SafeCoord(_settings.PanelLeft, 40));
             Canvas.SetTop(_panel, SafeCoord(_settings.PanelTop, 130));
+            InitWantedPosition(Canvas.GetLeft(_panel), Canvas.GetTop(_panel));
             // Provisional until the overlay window has a real size (see ShowPanel):
             // at plugin load HDT's overlay still has its design-time dimensions.
             _panel.PanelScale = _settings.Scale > 0 ? _settings.Scale : 1.0;
@@ -179,6 +180,7 @@ namespace MMRadar.Standalone
 
 
             _panel.PlayerClicked += OnPlayerClicked;
+            _panel.LayoutChanged += TrackWantedPosition; // before SaveLayout: it saves the wanted spot
             _panel.LayoutChanged += SaveLayout;
             _panel.LayoutChanged += UpdateHomeIconDirection; // the panel moved: re-aim the dock arrow
             _panel.SettingsRequested += ToggleSettingsCard;
@@ -834,6 +836,8 @@ namespace MMRadar.Standalone
         {
             Canvas.SetLeft(_panel, 40);
             Canvas.SetTop(_panel, 130);
+            _wantLeft = 40;
+            _wantTop = 130;
             _settings.PanelLeft = 40;
             _settings.PanelTop = 130;
             // Back to resolution-based auto scale.
@@ -881,8 +885,86 @@ namespace MMRadar.Standalone
             ApplyAutoScale();
             var was = IsPanelShown;
             _panel.Visibility = System.Windows.Visibility.Visible;
+            _overlay.ShowWithoutGame = true; // the test panel needs the overlay even without the game
+            KeepPanelOnScreen();
             if (!was)
                 PanelShownChanged?.Invoke(true);
+        }
+
+        // --- keeping the panel reachable ---
+        // The user's chosen spot is kept separately from where the panel is drawn:
+        // a spot outside a smaller game window (or one picked on a bigger desktop
+        // while previewing without the game) is pulled inside for display only,
+        // and the panel returns to it once the game window is big enough again.
+
+        private double _wantLeft = double.NaN;
+        private double _wantTop = double.NaN;
+        private double _shownLeft = double.NaN;
+        private double _shownTop = double.NaN;
+
+        private void InitWantedPosition(double left, double top)
+        {
+            _wantLeft = left;
+            _wantTop = top;
+            _overlay.Surface.SizeChanged += (s, e) => KeepPanelOnScreen();
+            _panel.SizeChanged += (s, e) => KeepPanelOnScreen();
+        }
+
+        /// <summary>After a drag or zoom: a position the user dragged to becomes the wanted one.</summary>
+        private void TrackWantedPosition()
+        {
+            var left = Canvas.GetLeft(_panel);
+            var top = Canvas.GetTop(_panel);
+            if (double.IsNaN(left) || double.IsNaN(top))
+                return;
+            // Unchanged from where we last drew it = a zoom, not a move: keep the
+            // wanted spot (it may lie outside and be drawn clamped right now).
+            var moved = double.IsNaN(_shownLeft) ||
+                        Math.Abs(left - _shownLeft) > 0.5 || Math.Abs(top - _shownTop) > 0.5;
+            if (moved)
+            {
+                _wantLeft = left;
+                _wantTop = top;
+            }
+            KeepPanelOnScreen();
+            if (moved && !double.IsNaN(_shownLeft))
+            {
+                // A drag past the edge settles where the panel actually landed.
+                _wantLeft = _shownLeft;
+                _wantTop = _shownTop;
+            }
+        }
+
+        /// <summary>
+        /// Draws the panel at the wanted spot, pulled inside the overlay when it
+        /// would end up out of view: fully inside horizontally, header inside
+        /// vertically (a tall panel may still run off the bottom edge).
+        /// </summary>
+        private void KeepPanelOnScreen()
+        {
+            try
+            {
+                if (_panel == null || double.IsNaN(_wantLeft))
+                    return;
+                var w = _overlay.Surface.ActualWidth;
+                var h = _overlay.Surface.ActualHeight;
+                if (w < 100 || h < 100)
+                    return; // overlay not laid out yet
+                var panelW = _panel.ActualWidth > 1 ? _panel.ActualWidth : 192 * _panel.PanelScale;
+                var headerH = Math.Min(_panel.ActualHeight > 1 ? _panel.ActualHeight : 40, 40 * _panel.PanelScale);
+                var left = Math.Max(0, Math.Min(_wantLeft, w - panelW));
+                var top = Math.Max(0, Math.Min(_wantTop, h - headerH));
+                _shownLeft = left;
+                _shownTop = top;
+                if (Math.Abs(Canvas.GetLeft(_panel) - left) > 0.5 || double.IsNaN(Canvas.GetLeft(_panel)))
+                    Canvas.SetLeft(_panel, left);
+                if (Math.Abs(Canvas.GetTop(_panel) - top) > 0.5 || double.IsNaN(Canvas.GetTop(_panel)))
+                    Canvas.SetTop(_panel, top);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("KeepPanelOnScreen: " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -932,6 +1014,7 @@ namespace MMRadar.Standalone
             _popupGeneration++; // cancel any in-flight details fetch re-showing the popup
             var was = IsPanelShown;
             _panel.Visibility = System.Windows.Visibility.Collapsed;
+            _overlay.ShowWithoutGame = false;
             if (was)
                 PanelShownChanged?.Invoke(false);
             _popup.Visibility = System.Windows.Visibility.Collapsed;
@@ -1141,8 +1224,9 @@ namespace MMRadar.Standalone
 
         private void CaptureLayout()
         {
-            var left = Canvas.GetLeft(_panel);
-            var top = Canvas.GetTop(_panel);
+            // The user's chosen spot, not a temporarily clamped one (see KeepPanelOnScreen).
+            var left = double.IsNaN(_wantLeft) ? Canvas.GetLeft(_panel) : _wantLeft;
+            var top = double.IsNaN(_wantTop) ? Canvas.GetTop(_panel) : _wantTop;
             if (!double.IsNaN(left)) _settings.PanelLeft = left;
             if (!double.IsNaN(top)) _settings.PanelTop = top;
             // Persist the scale only once the user explicitly chose one; an

@@ -50,6 +50,22 @@ namespace MMRadar.Hs
         internal const int SceneGameplay = 4;
     }
 
+    /// <summary>What the reader can tell the user about its link to the game.</summary>
+    public enum ReaderHealth
+    {
+        /// <summary>Hearthstone is not running.</summary>
+        NoGame,
+        /// <summary>The game is up but still loading — attaching is retried.</summary>
+        Starting,
+        /// <summary>Attached and reading sensible data.</summary>
+        Ok,
+        /// <summary>Hearthstone runs elevated; a normal process may not read it.</summary>
+        AccessDenied,
+        /// <summary>Attaching or reading keeps failing — most likely a game update
+        /// changed what MMRadar reads.</summary>
+        Unsupported,
+    }
+
     /// <summary>
     /// Reads Battlegrounds state straight from Hearthstone's Mono heap with the
     /// vendored UnitySpy reader — the data HDT used to hand the plugin. Field
@@ -85,6 +101,57 @@ namespace MMRadar.Hs
 
         public GameSnapshot Latest => _latest;
 
+        private volatile ReaderHealth _health = ReaderHealth.NoGame;
+
+        /// <summary>The link to the game as the user should hear about it.</summary>
+        public ReaderHealth Health => _health;
+
+        /// <summary>Raised on the reader thread when <see cref="Health"/> changes.</summary>
+        public event Action<ReaderHealth> HealthChanged;
+
+        private void SetHealth(ReaderHealth health, string why = null)
+        {
+            if (_health == health)
+                return;
+            _health = health;
+            Logger.Info("Reader health: " + health + (why != null ? " — " + why : ""));
+            try { HealthChanged?.Invoke(health); } catch { /* listeners must not stop the reader */ }
+        }
+
+        // --- health heuristics ---
+        // A failure is only reported once it outlasts its grace period: the game
+        // legitimately returns nothing while booting or switching scenes.
+
+        /// <summary>Attach keeps failing this long after the game started → unsupported.</summary>
+        private static readonly TimeSpan AttachGrace = TimeSpan.FromSeconds(120);
+        private DateTime _gameSeenSinceUtc;
+        private int _gameSeenPid;
+
+        private string _problem;
+        private DateTime _problemSinceUtc;
+
+        /// <summary>
+        /// Records this poll's problem (null = all reads made sense). A problem
+        /// that persists past its grace turns the health to Unsupported; a clean
+        /// poll turns it back to Ok.
+        /// </summary>
+        private void Observe(string problem, TimeSpan grace)
+        {
+            if (problem == null)
+            {
+                _problem = null;
+                SetHealth(ReaderHealth.Ok);
+                return;
+            }
+            if (problem != _problem)
+            {
+                _problem = problem;
+                _problemSinceUtc = DateTime.UtcNow;
+            }
+            if (DateTime.UtcNow - _problemSinceUtc >= grace)
+                SetHealth(ReaderHealth.Unsupported, problem);
+        }
+
         public void Start() => _thread.Start();
 
         public void Dispose()
@@ -113,6 +180,8 @@ namespace MMRadar.Hs
                     Logger.Debug("Reader poll failed: " + ex.Message);
                     if (!ProcessAlive())
                         Disconnect();
+                    else
+                        Observe("reads keep failing: " + ex.Message, TimeSpan.FromSeconds(60));
                 }
                 Thread.Sleep(interval);
             }
@@ -139,8 +208,16 @@ namespace MMRadar.Hs
                 Scene = scene,
                 TakenUtc = DateTime.UtcNow,
             };
+            if (scene == 0)
+            {
+                // No scene at all: fine for a moment while the game boots, a
+                // broken read path if it lasts.
+                Observe("scene unreadable", TimeSpan.FromSeconds(90));
+                return snap;
+            }
             if (scene != GameSnapshot.SceneGameplay)
             {
+                Observe(null, TimeSpan.Zero);
                 snap.Region = _region;
                 return snap;
             }
@@ -148,8 +225,18 @@ namespace MMRadar.Hs
             if (_gameType == 0)
                 _gameType = SafeInt(() => GetService("GameMgr")?["m_gameType"]);
             snap.GameType = _gameType;
-            if (!snap.IsBattlegrounds)
+            if (_gameType == 0)
+            {
+                // Every real game has a type; none in gameplay means the path to
+                // it changed — the panel could never tell a BG match apart.
+                Observe("game mode unreadable", TimeSpan.FromSeconds(30));
                 return snap;
+            }
+            if (!snap.IsBattlegrounds)
+            {
+                Observe(null, TimeSpan.Zero);
+                return snap;
+            }
 
             // Region is fixed for the session but may read as 0 early on — retry
             // until known, then keep it.
@@ -162,6 +249,9 @@ namespace MMRadar.Hs
             snap.Region = _region;
             snap.LocalBattleTag = _battleTag;
             snap.Players = ReadPlayers(snap.IsDuos);
+            // A Battlegrounds match always has named contestants within moments
+            // of hero select; none for minutes means the lobby can't be read.
+            Observe(snap.Players.Count == 0 ? "lobby unreadable" : null, TimeSpan.FromSeconds(120));
             return snap;
         }
 
@@ -202,23 +292,49 @@ namespace MMRadar.Hs
 
             var proc = Process.GetProcessesByName("Hearthstone").FirstOrDefault();
             if (proc == null)
+            {
+                _gameSeenSinceUtc = DateTime.MinValue;
+                SetHealth(ReaderHealth.NoGame);
                 return false;
+            }
             try
             {
+                if (_gameSeenSinceUtc == DateTime.MinValue || _gameSeenPid != proc.Id)
+                {
+                    _gameSeenPid = proc.Id; // a restarted game gets its own boot grace
+                    _gameSeenSinceUtc = GameStartedUtc(proc);
+                }
+
+                // An elevated game (e.g. Battle.net run as administrator) refuses
+                // memory reads from a normal process. Check it up front: UnitySpy's
+                // own failure would look like any other attach error.
+                if (IsAccessDenied(proc.Id))
+                {
+                    SetHealth(ReaderHealth.AccessDenied, "Hearthstone runs with administrator rights");
+                    return false;
+                }
+
                 // Fails while the game is still booting (Mono not ready yet) —
                 // simply retried on the next attempt.
                 _image = AssemblyImageFactory.Create(proc.Id, m => Logger.Debug("[UnitySpy] " + m));
                 _pid = proc.Id;
                 _region = null;
                 _lastScene = -1;
+                _problem = null;
                 _serviceSlotHints.Clear();
                 Logger.Info($"Attached to Hearthstone (pid {_pid})");
+                SetHealth(ReaderHealth.Ok);
                 return true;
             }
             catch (Exception ex)
             {
                 Logger.Debug("Attach to Hearthstone failed (will retry): " + ex.Message);
                 _image = null;
+                // Booting games fail to attach for a while; one that has been up
+                // for minutes and still can't be attached is a version we can't read.
+                SetHealth(DateTime.UtcNow - _gameSeenSinceUtc >= AttachGrace
+                    ? ReaderHealth.Unsupported
+                    : ReaderHealth.Starting, ex.Message);
                 return false;
             }
             finally
@@ -226,6 +342,40 @@ namespace MMRadar.Hs
                 proc.Dispose();
             }
         }
+
+        private static DateTime GameStartedUtc(Process proc)
+        {
+            try
+            {
+                return proc.StartTime.ToUniversalTime();
+            }
+            catch
+            {
+                return DateTime.UtcNow; // start time hidden (elevated): count from now
+            }
+        }
+
+        /// <summary>True when Windows refuses to let this process read the game.</summary>
+        private static bool IsAccessDenied(int pid)
+        {
+            var handle = OpenProcess(ProcessVmRead | ProcessQueryInformation, false, pid);
+            if (handle != IntPtr.Zero)
+            {
+                CloseHandle(handle);
+                return false;
+            }
+            return System.Runtime.InteropServices.Marshal.GetLastWin32Error() == ErrorAccessDenied;
+        }
+
+        private const int ProcessVmRead = 0x0010;
+        private const int ProcessQueryInformation = 0x0400;
+        private const int ErrorAccessDenied = 5;
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(int access, bool inherit, int pid);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern bool CloseHandle(IntPtr handle);
 
         private bool ProcessAlive()
         {

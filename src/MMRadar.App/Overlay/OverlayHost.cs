@@ -36,6 +36,25 @@ namespace MMRadar.Overlay
         /// <summary>Set while the panel is wanted on screen at all.</summary>
         public bool Wanted { get; set; } = true;
 
+        /// <summary>
+        /// Without the game the overlay exists only for the test panel. Otherwise
+        /// it stays hidden: an invisible topmost screen-sized window would sit over
+        /// every other app (and other fullscreen games) for no reason.
+        /// </summary>
+        public bool ShowWithoutGame
+        {
+            get => _showWithoutGame;
+            set
+            {
+                if (_showWithoutGame == value)
+                    return;
+                _showWithoutGame = value;
+                Follow(); // apply now, not on the next 250 ms tick
+            }
+        }
+
+        private bool _showWithoutGame;
+
         public OverlayHost()
         {
             Title = "MMRadar Overlay";
@@ -86,7 +105,7 @@ namespace MMRadar.Overlay
                     // positioning preview works from the tray.
                     var wa = SystemParameters.WorkArea;
                     Place(new Rect(wa.Left, wa.Top, wa.Width, wa.Height));
-                    SetShown(Wanted);
+                    SetShown(Wanted && ShowWithoutGame);
                     return;
                 }
 

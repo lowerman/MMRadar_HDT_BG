@@ -49,14 +49,18 @@ namespace MMRadar.Standalone
         /// <summary>Shows the welcome card (first run only).</summary>
         public void ShowWelcome() => WelcomeCard.Visibility = Visibility.Visible;
 
-        public void SetStatus(string title, string detail, bool ok)
+        /// <param name="ok">Green dot: connected and working.</param>
+        /// <param name="warning">Amber dot: something the user has to act on.</param>
+        public void SetStatus(string title, string detail, bool ok, bool warning = false)
         {
             StatusTitle.Text = title;
             StatusDetail.Text = detail;
             StatusDetail.Visibility = string.IsNullOrEmpty(detail) ? Visibility.Collapsed : Visibility.Visible;
-            StatusDot.Fill = new SolidColorBrush(ok
-                ? Color.FromRgb(0x34, 0xC2, 0x86)
-                : Color.FromRgb(0x8B, 0x94, 0x9E));
+            StatusDot.Fill = new SolidColorBrush(warning
+                ? Color.FromRgb(0xF0, 0xA8, 0x48)
+                : ok
+                    ? Color.FromRgb(0x34, 0xC2, 0x86)
+                    : Color.FromRgb(0x8B, 0x94, 0x9E));
         }
 
         // --- updates ---
