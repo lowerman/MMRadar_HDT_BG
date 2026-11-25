@@ -85,7 +85,20 @@ namespace MMRadar.Standalone
             if (first == null || first.ActualHeight < 1)
                 return;
             _rowHeight = first.ActualHeight;
-            GamesScroller.MaxHeight = Math.Round(_rowHeight * VisibleRows);
+            var viewport = Math.Round(_rowHeight * VisibleRows);
+            GamesScroller.MaxHeight = viewport;
+            // The viewport is a row and a half-ish, so with the last row flush at
+            // the bottom the top row would be cut. A little empty space below the
+            // last game makes the scroll range a whole number of rows: every stop,
+            // the end included, starts with a full row at the top.
+            var content = GamesControl.Items.Count * _rowHeight;
+            var pad = 0.0;
+            if (content > viewport)
+            {
+                var rem = (content - viewport) % _rowHeight;
+                pad = rem < 0.5 ? 0 : _rowHeight - rem;
+            }
+            GamesControl.Margin = new Thickness(0, 0, 12, pad);
             UpdateListFade();
         }
 
@@ -111,7 +124,41 @@ namespace MMRadar.Standalone
         /// <summary>Wheel delta not yet turned into whole rows (touchpads).</summary>
         private int _wheelAccum;
 
-        private void GamesScroller_ScrollChanged(object sender, ScrollChangedEventArgs e) => UpdateListFade();
+        private void GamesScroller_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            SnapToRow();
+            UpdateListFade();
+        }
+
+        private bool _thumbDragging;
+
+        private void HookThumbDrag()
+        {
+            GamesScroller.AddHandler(System.Windows.Controls.Primitives.Thumb.DragStartedEvent,
+                new System.Windows.Controls.Primitives.DragStartedEventHandler((s, e) => _thumbDragging = true));
+            GamesScroller.AddHandler(System.Windows.Controls.Primitives.Thumb.DragCompletedEvent,
+                new System.Windows.Controls.Primitives.DragCompletedEventHandler((s, e) =>
+                {
+                    _thumbDragging = false;
+                    SnapToRow();
+                }));
+        }
+
+        /// <summary>
+        /// Thumb drags and track clicks can stop anywhere; settle them on a row
+        /// boundary like the wheel does (the very end of the list may stay
+        /// unaligned — that is where the last row sits flush at the bottom).
+        /// </summary>
+        private void SnapToRow()
+        {
+            if (_thumbDragging || _rowHeight < 1 || GamesScroller.ScrollableHeight <= 0)
+                return;
+            var offset = GamesScroller.VerticalOffset;
+            var snapped = Math.Round(offset / _rowHeight) * _rowHeight;
+            snapped = Math.Max(0, Math.Min(snapped, GamesScroller.ScrollableHeight));
+            if (Math.Abs(snapped - offset) > 0.5)
+                GamesScroller.ScrollToVerticalOffset(snapped);
+        }
 
         /// <summary>
         /// Soft fade on the edge(s) that have more rows behind them, so the list
@@ -128,7 +175,11 @@ namespace MMRadar.Standalone
                 return;
             }
             var f = Math.Min(0.25, FadePx / viewport);
-            var moreAbove = GamesScroller.VerticalOffset > 0.5;
+            // Top edge: fade only a row that is actually cut (end of the list, or
+            // mid-drag). A whole row at the top must not look dimmed.
+            var cutAbove = _rowHeight >= 1 && GamesScroller.VerticalOffset > 0.5 &&
+                           Math.Abs(GamesScroller.VerticalOffset - Math.Round(GamesScroller.VerticalOffset / _rowHeight) * _rowHeight) > 0.5;
+            var moreAbove = cutAbove;
             var moreBelow = GamesScroller.VerticalOffset < GamesScroller.ScrollableHeight - 0.5;
             var mask = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
             mask.GradientStops.Add(new GradientStop(moreAbove ? Colors.Transparent : Colors.Black, 0));
@@ -156,6 +207,7 @@ namespace MMRadar.Standalone
             InitializeComponent();
             ThemeManager.ApplyToResources(Resources);
             ThemeManager.ThemeChanged += OnThemeChanged;
+            HookThumbDrag();
         }
 
         private void OnThemeChanged()
