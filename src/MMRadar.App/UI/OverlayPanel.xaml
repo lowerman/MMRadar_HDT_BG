@@ -150,10 +150,14 @@
                                     <!-- rating: same size and contrast as the name.
                                          Ideal formatting: Display-mode hinting gives
                                          Segoe UI a narrower "1" at some sizes, which
-                                         breaks the digit columns across rows. -->
+                                         breaks the digit columns across rows. Tabular
+                                         numerals: Segoe UI's default "1" is narrower than
+                                         the other digits, so right-aligned ratings with
+                                         ones in them started further right. -->
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding RatingText}"
                                                TextOptions.TextFormattingMode="Ideal"
+                                               Typography.NumeralAlignment="Tabular"
                                                FontSize="{DynamicResource RowFontSize}" FontWeight="SemiBold"
                                                Foreground="{Binding RatingBrush}"
                                                Opacity="{Binding TextOpacity}"
