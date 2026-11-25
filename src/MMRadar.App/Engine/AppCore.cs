@@ -344,7 +344,7 @@ namespace MMRadar.Standalone
                         // the leaderboard portraits reveals names one by one (the
                         // hover reader picks them up and the panel fills in).
                         _spectateNoticeShown = true;
-                        _panel.SetStatus("Spectating — hover the leaderboard portraits to reveal players");
+                        _panel.SetStatus("Spectating: hover the leaderboard portraits to reveal players");
                     }
                 }
                 else if (_phase == Phase.Loaded || _phase == Phase.Fetching)
@@ -431,9 +431,9 @@ namespace MMRadar.Standalone
                 // Shown as the hover text of the coral title dot — the compact
                 // outage state replaces the old full-width status line.
                 statusMessage = ex is WalliiAuthException
-                    ? "wallii.gg rejected the access key — showing official leaderboard ratings only.\n" +
+                    ? "wallii.gg rejected the access key. Showing official leaderboard ratings only.\n" +
                       "Detailed stats return once the key is updated."
-                    : "wallii.gg is unavailable — showing official leaderboard ratings only.\n" +
+                    : "wallii.gg is unavailable. Showing official leaderboard ratings only.\n" +
                       "Detailed stats return automatically when it is back.";
                 _lastFetchFailed = true;
                 _nextRetryAtUtc = DateTime.UtcNow.AddSeconds(30);
@@ -671,7 +671,7 @@ namespace MMRadar.Standalone
                 // No match running: preview with the live global top-8.
                 _previewActive = true;
                 ShowWaitingClean();
-                _panel.SetStatus("PREVIEW — loading top players…");
+                _panel.SetStatus("PREVIEW · loading top players…");
                 ShowPanel();
                 _ = ShowTopPreviewAsync(++_previewGeneration);
             }
@@ -689,7 +689,7 @@ namespace MMRadar.Standalone
             try
             {
                 lobby = await _wallii.GetTopLobbyAsync("0").ConfigureAwait(false);
-                status = "PREVIEW — current top 8 · wallii.gg";
+                status = "PREVIEW · current top 8 · wallii.gg";
                 if (lobby.Count == 0)
                     throw new WalliiApiException("empty top-players result", null);
             }
@@ -697,7 +697,7 @@ namespace MMRadar.Standalone
             {
                 Logger.Debug("Top-8 preview unavailable, using sample data: " + ex.Message);
                 lobby = SampleData.Lobby();
-                status = "PREVIEW — sample data (wallii.gg unavailable)";
+                status = "PREVIEW · sample data (wallii.gg unavailable)";
                 live = false;
             }
 
@@ -716,8 +716,8 @@ namespace MMRadar.Standalone
                     s.OnLeaderboard = false;
                     s.IsLive = false;
                 }
-                outage = "Simulated wallii.gg outage — showing official leaderboard ratings only.";
-                status = "PREVIEW — wallii outage simulation";
+                outage = "Simulated wallii.gg outage. Showing official leaderboard ratings only.";
+                status = "PREVIEW · wallii outage simulation";
             }
 
             RunOnUi(() =>

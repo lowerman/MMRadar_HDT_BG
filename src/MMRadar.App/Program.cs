@@ -80,7 +80,7 @@ namespace MMRadar.Standalone
                 }
                 catch
                 {
-                    Forms.MessageBox.Show("MMRadar is already running — look for its icon in the system tray.",
+                    Forms.MessageBox.Show("MMRadar is already running. Look for its icon in the system tray.",
                         "MMRadar", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
                 }
                 return 0;
@@ -132,7 +132,7 @@ namespace MMRadar.Standalone
                     "MMRadar is running straight from the zip file, so some of its files are missing.\n\n" +
                     "Extract the whole zip first (right-click it → Extract All…) into a folder you keep, " +
                     "for example Documents\\MMRadar, then start MMRadar.exe from there.",
-                    "MMRadar — extract the zip first",
+                    "MMRadar: extract the zip first",
                     Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Warning);
                 return true;
             }
@@ -180,13 +180,13 @@ namespace MMRadar.Standalone
             if (_justUpdated)
             {
                 _tray.ShowBalloonTip(4000, $"MMRadar updated to {Version}",
-                    "Everything is ready — your settings were kept.", Forms.ToolTipIcon.Info);
+                    "Everything is ready, and your settings were kept.", Forms.ToolTipIcon.Info);
             }
             else if (_autostart && _core.AppSettings.WelcomeShown)
             {
                 // Started with Windows: settle quietly into the tray.
                 _tray.ShowBalloonTip(4000,
-                    AppCore.SimulateWalliiDown ? "MMRadar is running — wallii outage simulation" : "MMRadar is running",
+                    AppCore.SimulateWalliiDown ? "MMRadar is running (wallii outage simulation)" : "MMRadar is running",
                     "The panel appears automatically in Battlegrounds. Click here for options.",
                     Forms.ToolTipIcon.Info);
             }
@@ -259,7 +259,7 @@ namespace MMRadar.Standalone
             {
                 title = "Can't read this Hearthstone version";
                 detail = "Hearthstone was probably updated in a way MMRadar doesn't understand yet. " +
-                         "Check for updates below — a fix usually follows within days.";
+                         "Check for updates below. A fix usually follows within days.";
                 ok = false;
                 warning = true;
             }
@@ -272,7 +272,7 @@ namespace MMRadar.Standalone
             else if (!snap.Connected)
             {
                 title = "Waiting for Hearthstone";
-                detail = "Start the game — MMRadar connects to it on its own.";
+                detail = "Start the game and MMRadar connects to it on its own.";
             }
             else if (_tracker.InBattlegroundsMatch)
             {
@@ -285,7 +285,7 @@ namespace MMRadar.Standalone
                 title = "Connected to Hearthstone";
                 detail = _core.OverlayEnabled
                     ? "The panel appears when a Battlegrounds match starts."
-                    : "The overlay is turned off — enable it in the tray menu.";
+                    : "The overlay is turned off. Enable it in the tray menu.";
             }
             if (AppCore.SimulateWalliiDown)
                 detail += "\nTest mode: wallii outage simulation is on.";
@@ -370,11 +370,11 @@ namespace MMRadar.Standalone
             string text;
             switch (health)
             {
-                case ReaderHealth.AccessDenied: text = "MMRadar — Hearthstone runs as administrator"; break;
-                case ReaderHealth.Unsupported: text = "MMRadar — can't read this Hearthstone version"; break;
-                case ReaderHealth.Starting: text = "MMRadar — Hearthstone is starting"; break;
+                case ReaderHealth.AccessDenied: text = "MMRadar: Hearthstone runs as administrator"; break;
+                case ReaderHealth.Unsupported: text = "MMRadar: can't read this Hearthstone version"; break;
+                case ReaderHealth.Starting: text = "MMRadar: Hearthstone is starting"; break;
                 default:
-                    text = connected ? $"MMRadar {Version} — connected to Hearthstone" : "MMRadar — waiting for Hearthstone";
+                    text = connected ? $"MMRadar {Version}: connected to Hearthstone" : "MMRadar: waiting for Hearthstone";
                     break;
             }
             if (AppCore.SimulateWalliiDown)
@@ -439,7 +439,7 @@ namespace MMRadar.Standalone
             {
                 Logger.Debug("Update check failed: " + ex.Message);
                 if (manual)
-                    _window?.ShowCheckResult("Couldn't reach GitHub — check your connection and try again.");
+                    _window?.ShowCheckResult("Couldn't reach GitHub. Check your connection and try again.");
                 return;
             }
 
@@ -464,7 +464,7 @@ namespace MMRadar.Standalone
                 _core.AppSettings.LastAnnouncedVersion = v;
                 _core.AppSettings.Save();
                 _tray.ShowBalloonTip(6000, $"MMRadar {v} is available",
-                    "Click here to update — it takes a few seconds.", Forms.ToolTipIcon.Info);
+                    "Click here to update. It takes a few seconds.", Forms.ToolTipIcon.Info);
             }
         }
 
@@ -491,7 +491,7 @@ namespace MMRadar.Standalone
                 Logger.Error("Update failed", ex);
                 _updating = false;
                 _window?.ShowUpdateError(
-                    "The update didn't go through — nothing was changed. " +
+                    "The update didn't go through, nothing was changed. " +
                     "Try again, or download it from the release page (What's new).");
             }
         }

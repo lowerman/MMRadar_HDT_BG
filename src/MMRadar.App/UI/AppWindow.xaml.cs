@@ -70,7 +70,7 @@ namespace MMRadar.Standalone
             UpdateCard.Visibility = Visibility.Visible;
             UpdateTitle.Text = $"Version {update.Version.ToString(3)} is available";
             UpdateDetail.Text = canInstallInPlace
-                ? "Takes a few seconds — MMRadar restarts by itself and keeps your settings."
+                ? "Takes a few seconds. MMRadar restarts by itself and keeps your settings."
                 : "MMRadar's folder is read-only, so the update has to be downloaded manually.";
             UpdateButton.Content = canInstallInPlace ? "Update now" : "Download";
             UpdateButton.IsEnabled = true;
