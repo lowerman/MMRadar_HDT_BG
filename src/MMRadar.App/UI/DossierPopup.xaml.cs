@@ -70,9 +70,6 @@ namespace MMRadar.Standalone
         /// <summary>Rows moved per wheel notch.</summary>
         private const int RowsPerNotch = 1;
 
-        /// <summary>Height of the edge fade that marks hidden rows above / below.</summary>
-        private const double FadePx = 18;
-
         private double _rowHeight;
 
         private void QueueFitList() =>
@@ -161,31 +158,48 @@ namespace MMRadar.Standalone
         }
 
         /// <summary>
-        /// Soft fade on the edge(s) that have more rows behind them, so the list
-        /// reads as scrollable without any extra chrome. No fade when it all fits.
+        /// Fades out exactly the row the viewport cuts (the half row at the bottom
+        /// while more games follow; at the top only mid-drag), so the list reads as
+        /// scrollable without extra chrome. Whole rows are never dimmed.
+        ///
+        /// The mask is in ABSOLUTE viewport coordinates: a relative mask maps to
+        /// the presenter's content bounds — the whole scrolled list — so the fade
+        /// drifted with the scroll position and dimmed whole rows near the ends.
         /// </summary>
         private void UpdateListFade()
         {
             if (!(GamesScroller.Template?.FindName("PART_ScrollContentPresenter", GamesScroller) is UIElement presenter))
                 return;
             var viewport = GamesScroller.ViewportHeight;
-            if (GamesScroller.ScrollableHeight <= 0 || viewport < 1)
+            var offset = GamesScroller.VerticalOffset;
+            if (GamesScroller.ScrollableHeight <= 0 || viewport < 1 || _rowHeight < 1)
             {
                 presenter.OpacityMask = null;
                 return;
             }
-            var f = Math.Min(0.25, FadePx / viewport);
-            // Top edge: fade only a row that is actually cut (end of the list, or
-            // mid-drag). A whole row at the top must not look dimmed.
-            var cutAbove = _rowHeight >= 1 && GamesScroller.VerticalOffset > 0.5 &&
-                           Math.Abs(GamesScroller.VerticalOffset - Math.Round(GamesScroller.VerticalOffset / _rowHeight) * _rowHeight) > 0.5;
-            var moreAbove = cutAbove;
-            var moreBelow = GamesScroller.VerticalOffset < GamesScroller.ScrollableHeight - 0.5;
-            var mask = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
-            mask.GradientStops.Add(new GradientStop(moreAbove ? Colors.Transparent : Colors.Black, 0));
-            mask.GradientStops.Add(new GradientStop(Colors.Black, f));
-            mask.GradientStops.Add(new GradientStop(Colors.Black, 1 - f));
-            mask.GradientStops.Add(new GradientStop(moreBelow ? Colors.Transparent : Colors.Black, 1));
+
+            // Visible part of a cut row at each edge (0 = the edge falls between rows).
+            double Cut(double v) { var r = v % _rowHeight; return r < 0.5 || _rowHeight - r < 0.5 ? 0 : r; }
+            var topRem = Cut(offset);
+            var top = topRem > 0 ? _rowHeight - topRem : 0;
+            var moreBelow = offset < GamesScroller.ScrollableHeight - 0.5;
+            var bottom = moreBelow ? Cut(offset + viewport) : 0;
+            if (top <= 0 && bottom <= 0)
+            {
+                presenter.OpacityMask = null;
+                return;
+            }
+
+            var mask = new LinearGradientBrush
+            {
+                MappingMode = BrushMappingMode.Absolute,
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(0, viewport),
+            };
+            mask.GradientStops.Add(new GradientStop(top > 0 ? Colors.Transparent : Colors.Black, 0));
+            mask.GradientStops.Add(new GradientStop(Colors.Black, top / viewport));
+            mask.GradientStops.Add(new GradientStop(Colors.Black, 1 - bottom / viewport));
+            mask.GradientStops.Add(new GradientStop(bottom > 0 ? Colors.Transparent : Colors.Black, 1));
             mask.Freeze();
             presenter.OpacityMask = mask;
         }
