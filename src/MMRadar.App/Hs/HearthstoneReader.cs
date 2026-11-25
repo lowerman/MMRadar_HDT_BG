@@ -140,6 +140,7 @@ namespace MMRadar.Hs
             if (problem == null)
             {
                 _problem = null;
+                _reattaches = 0;
                 SetHealth(ReaderHealth.Ok);
                 return;
             }
@@ -148,9 +149,26 @@ namespace MMRadar.Hs
                 _problem = problem;
                 _problemSinceUtc = DateTime.UtcNow;
             }
+            // Attached at the very first moment of a game's boot, the reader can
+            // latch type data that is never filled in (seen live: scene read 0 for
+            // minutes while the game was in a match). A fresh attach fixes that,
+            // so try a few before blaming the game version.
+            if (DateTime.UtcNow - _problemSinceUtc >= ReattachAfter && _reattaches < MaxReattaches)
+            {
+                _reattaches++;
+                Logger.Info($"Reader: re-attaching to Hearthstone ({problem}, attempt {_reattaches} of {MaxReattaches})");
+                Disconnect();
+                _nextConnectUtc = DateTime.MinValue;
+                _problem = null;
+                return;
+            }
             if (DateTime.UtcNow - _problemSinceUtc >= grace)
                 SetHealth(ReaderHealth.Unsupported, problem);
         }
+
+        private static readonly TimeSpan ReattachAfter = TimeSpan.FromSeconds(20);
+        private const int MaxReattaches = 3;
+        private int _reattaches;
 
         public void Start() => _thread.Start();
 
@@ -303,6 +321,7 @@ namespace MMRadar.Hs
                 {
                     _gameSeenPid = proc.Id; // a restarted game gets its own boot grace
                     _gameSeenSinceUtc = GameStartedUtc(proc);
+                    _reattaches = 0;        // ...and its own re-attach budget
                 }
 
                 // An elevated game (e.g. Battle.net run as administrator) refuses
