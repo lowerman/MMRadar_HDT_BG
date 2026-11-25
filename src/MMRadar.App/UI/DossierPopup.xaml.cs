@@ -97,11 +97,55 @@ namespace MMRadar.Standalone
             // stops with a row sliced in half at the top.
             // Touchpads send many small deltas: at least one row per event.
             var rows = Math.Max(1, (int)Math.Round(Math.Abs(e.Delta) / 120.0 * RowsPerNotch));
-            var row = Math.Round(GamesScroller.VerticalOffset / _rowHeight);
+            // Quick notches stack onto the running animation's destination, so a
+            // flick of several notches becomes one continuous glide.
+            var from = _scrollAnimating ? _scrollTarget : GamesScroller.VerticalOffset;
+            var row = Math.Round(from / _rowHeight);
             var target = (row - Math.Sign(e.Delta) * rows) * _rowHeight;
             target = Math.Max(0, Math.Min(target, GamesScroller.ScrollableHeight));
-            GamesScroller.ScrollToVerticalOffset(target);
+            AnimateScrollTo(target);
             e.Handled = true;
+        }
+
+        /// <summary>Wheel scroll duration; ease-out so the stop point is easy to follow.</summary>
+        private static readonly TimeSpan ScrollDuration = TimeSpan.FromMilliseconds(180);
+
+        private bool _scrollAnimating;
+        private double _scrollFrom;
+        private double _scrollTarget;
+        private DateTime _scrollStartedUtc;
+
+        private void AnimateScrollTo(double target)
+        {
+            _scrollFrom = GamesScroller.VerticalOffset;
+            _scrollTarget = target;
+            _scrollStartedUtc = DateTime.UtcNow;
+            if (!_scrollAnimating)
+            {
+                _scrollAnimating = true;
+                CompositionTarget.Rendering += OnScrollFrame;
+            }
+        }
+
+        private void StopScrollAnimation()
+        {
+            if (!_scrollAnimating)
+                return;
+            _scrollAnimating = false;
+            CompositionTarget.Rendering -= OnScrollFrame;
+        }
+
+        private void OnScrollFrame(object sender, EventArgs e)
+        {
+            var t = (DateTime.UtcNow - _scrollStartedUtc).TotalMilliseconds / ScrollDuration.TotalMilliseconds;
+            if (t >= 1 || !IsVisible)
+            {
+                GamesScroller.ScrollToVerticalOffset(_scrollTarget);
+                StopScrollAnimation();
+                return;
+            }
+            var eased = 1 - Math.Pow(1 - t, 3); // ease-out cubic
+            GamesScroller.ScrollToVerticalOffset(_scrollFrom + (_scrollTarget - _scrollFrom) * eased);
         }
 
         private void GamesScroller_ScrollChanged(object sender, ScrollChangedEventArgs e) => UpdateListFade();
@@ -221,6 +265,7 @@ namespace MMRadar.Standalone
                 MmrText = UiHelpers.FormatRating(g.EndingMmr),
             }).ToList();
 
+            StopScrollAnimation();
             GamesScroller.ScrollToTop(); // every dossier opens at the newest game
             QueueFitList();
 
