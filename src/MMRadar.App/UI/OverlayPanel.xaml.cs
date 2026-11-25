@@ -1,0 +1,539 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media.Animation;
+using MMRadar.Game;
+using MMRadar.UI;
+using MMRadar.Wallii;
+
+namespace MMRadar.Standalone
+{
+    /// <summary>
+    /// The main overlay card listing the 8 lobby players with rating and avg placement.
+    /// Deliberately free of HDT dependencies so it can be exercised in the harness.
+    /// </summary>
+    public partial class OverlayPanel : UserControl
+    {
+        public event Action<PlayerSummary> PlayerClicked;
+        public event Action LayoutChanged;
+
+        /// <summary>Raised by the ⚙ header button; the host opens the settings dialog.</summary>
+        public event Action SettingsRequested;
+
+        /// <summary>Raised when the user changes the scale via the mouse wheel.</summary>
+        public event Action ScaleChangedByUser;
+
+        /// <summary>Raised when the user collapses/expands the panel.</summary>
+        public event Action<bool> CollapsedChanged;
+
+        private bool _dragging;
+        private Point _dragStart;
+        private double _dragDistance;
+        private bool _collapsed;
+        private List<LobbyRowVm> _rows = new List<LobbyRowVm>();
+
+        private double _layoutScale = 1.0;
+
+        /// <summary>
+        /// Zoom factor. Applied by scaling font sizes and layout metrics — never a
+        /// RenderTransform, which would blur the text at any non-1.0 zoom.
+        /// </summary>
+        public double PanelScale
+        {
+            get => _layoutScale;
+            set
+            {
+                var clamped = Math.Max(0.5, Math.Min(value, 2.0));
+                if (Math.Abs(clamped - _layoutScale) < 0.001)
+                    return;
+                _layoutScale = clamped;
+                ApplyLayoutScale();
+            }
+        }
+
+        private void ApplyLayoutScale()
+        {
+            var k = _layoutScale;
+            // Display-mode ClearType hints every glyph to the pixel grid; at
+            // FRACTIONAL font sizes (e.g. 16 × 1.2 = 19.2) the hinted digit
+            // advances stop being uniform, so the rating digits drift out of
+            // their columns row by row. Rounding every scaled metric to whole
+            // pixels keeps the type both crisp and columnar.
+            double R(double v) => Math.Max(1.0, Math.Round(v));
+            Resources["RowFontSize"] = R(16.0 * k);
+            Resources["ChipFontSize"] = R(13.5 * k);
+            Resources["RowHeight"] = R(24.0 * k);
+            Resources["NameMaxWidth"] = R(150.0 * k);
+            Resources["BadgeFontSize"] = R(10.5 * k);
+            Resources["MarkFontSize"] = R(12.0 * k);
+            Resources["DotSize"] = R(6.0 * k);
+            Resources["TitleFontSize"] = R(11.0 * k);
+            Resources["CtxFontSize"] = R(11.0 * k);
+            Resources["StatusFontSize"] = R(11.5 * k);
+            Resources["HeaderBtnSize"] = R(18.0 * k);
+            Resources["HeaderBtnFont"] = R(10.0 * k);
+            Resources["HeaderGearFont"] = R(11.0 * k);
+            // The 52 px column is sized for a chip; bare digits need far less, so
+            // the "Text" style gets a narrow column instead of an empty strip.
+            var chipCol = ThemeManager.ChipStyle == "bare" ? 34.0 : 52.0;
+            Resources["ChipColWidth"] = new GridLength(_walliiDownReason != null ? 0 : R(chipCol * k));
+            RootBorder.MinWidth = _collapsed ? 0 : R(192.0 * k);
+        }
+
+        private string _walliiDownReason;
+
+        /// <summary>
+        /// Compact "wallii is unreachable" state (opt-in; null clears it): the
+        /// title dot turns coral and explains itself on hover, and the avg
+        /// column — a row of dashes without wallii — folds away entirely,
+        /// instead of a full-width status line plus eight "–" marks.
+        /// </summary>
+        public void SetWalliiUnavailable(string reason)
+        {
+            _walliiDownReason = reason;
+            Resources["ChipColVisibility"] = reason != null ? Visibility.Collapsed : Visibility.Visible;
+            ApplyLayoutScale();
+            if (reason != null)
+                TitleDot.Fill = ThemeManager.Freeze(System.Windows.Media.Color.FromArgb(0xFF, 0xF8, 0x71, 0x71));
+            else
+                TitleDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
+            TitleBlock.ToolTip = reason;
+            if (_lastSummaries != null)
+                UpdateLobbyContext(_lastSummaries); // header delta follows the state
+        }
+
+        private IReadOnlyList<PlayerSummary> _lastSummaries;
+        private string _lastStatus;
+
+        public OverlayPanel()
+        {
+            InitializeComponent();
+            ThemeManager.ApplyToResources(Resources);
+            ThemeManager.ThemeChanged += OnThemeChanged;
+            ApplyLayoutScale(); // the XAML defaults assume chips; "Text" style is narrower
+            // Collapsed panels sit at ~30% opacity until hovered, so they do not
+            // draw attention during a game.
+            MouseEnter += (s, e) => UpdateIdleOpacity();
+            MouseLeave += (s, e) => UpdateIdleOpacity();
+        }
+
+        private void OnThemeChanged()
+        {
+            ThemeManager.ApplyToResources(Resources);
+            ApplyLayoutScale(); // the avg column width follows the chip style
+            // Row brushes are computed per theme — rebuild them from the last data.
+            if (_lastSummaries != null)
+            {
+                var status = _lastStatus;
+                SetStats(_lastSummaries);
+                if (status != null)
+                    SetStatus(status);
+            }
+        }
+
+        /// <summary>Collapsed = a small low-opacity pill instead of the full card.</summary>
+        public bool IsCollapsed
+        {
+            get => _collapsed;
+            set
+            {
+                if (_collapsed == value)
+                    return;
+                _collapsed = value;
+                ApplyCollapsedVisual();
+            }
+        }
+
+        private void ApplyCollapsedVisual()
+        {
+            Body.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
+            TitleRankPart.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
+            CollapseButton.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
+            SettingsButton.Visibility = _collapsed ? Visibility.Collapsed : Visibility.Visible;
+            HeaderContextText.Visibility = !_collapsed && _hasLobbyContext
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            RootBorder.MinWidth = _collapsed ? 0 : Math.Round(192.0 * _layoutScale);
+            Header.Cursor = _collapsed ? Cursors.Hand : Cursors.SizeAll;
+            Header.ToolTip = _collapsed ? "Click to expand · drag to move" : null;
+            UpdateIdleOpacity();
+        }
+
+        private void UpdateIdleOpacity()
+        {
+            var target = _collapsed && !IsMouseOver ? 0.3 : 1.0;
+            RootBorder.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(target, TimeSpan.FromMilliseconds(160)));
+        }
+
+        public void ShowWaiting()
+        {
+            RowsControl.ItemsSource = _rows = new List<LobbyRowVm>();
+            HeaderContextText.Visibility = Visibility.Collapsed;
+            StatusText.Text = "Waiting for lobby…";
+            StatusText.Visibility = Visibility.Visible;
+        }
+
+        public void ShowLoading(IReadOnlyList<LobbyPlayerInfo> players)
+        {
+            HeaderContextText.Visibility = Visibility.Collapsed;
+            StatusText.Text = "Loading wallii.gg stats…";
+            StatusText.Visibility = Visibility.Visible;
+            _rows = players
+                .Select(p => new LobbyRowVm
+                {
+                    Name = p.IsLocalPlayer ? "you" : p.Name,
+                    NameBrush = p.IsLocalPlayer
+                        ? ThemeManager.Freeze(ThemeManager.Current.Accent)
+                        : ThemeManager.Freeze(ThemeManager.Current.TextPrimary),
+                    IsLocal = p.IsLocalPlayer,
+                    HasStats = false,
+                    RatingText = "…",
+                })
+                .ToList();
+            RowsControl.ItemsSource = _rows;
+        }
+
+        private static int EffectiveRating(PlayerSummary s) =>
+            s.OnLeaderboard ? s.Rating : s.FallbackRating ?? (s.BelowCutoff ? 1 : 0);
+
+        private bool _sortAscending;
+
+        /// <summary>False = highest rating on top (default); true = lowest on top.</summary>
+        public bool SortAscending
+        {
+            get => _sortAscending;
+            set
+            {
+                if (_sortAscending == value)
+                    return;
+                _sortAscending = value;
+                if (_lastSummaries != null)
+                {
+                    var status = _lastStatus;
+                    SetStats(_lastSummaries);
+                    if (status != null)
+                        SetStatus(status);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Rating order honoring the direction setting. Ascending is the strict
+        /// mirror of descending: unknowns, then "&lt;8 000", then ratings up —
+        /// the strongest player ends up at the very bottom.
+        /// </summary>
+        private IOrderedEnumerable<PlayerSummary> OrderByRating(IEnumerable<PlayerSummary> src) =>
+            _sortAscending
+                ? src.OrderBy(EffectiveRating)
+                    .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase)
+                : src.OrderByDescending(EffectiveRating)
+                    .ThenBy(s => s.LobbyName, StringComparer.OrdinalIgnoreCase);
+
+        public void SetStats(IReadOnlyList<PlayerSummary> summaries)
+        {
+            // Death flags live on the row VMs and refresh only every ~2 s
+            // (UpdateLiveState) — a repaint in between must not resurrect anyone,
+            // so they carry over from the rows being replaced. Matching mirrors
+            // UpdateLiveState: by game player id when known, by name only while
+            // it is unambiguous (namesakes without ids wait for the next refresh).
+            Dictionary<int, string> deadIds = null;
+            HashSet<string> deadNames = null;
+            if (_rows != null && _rows.Any(r => r.IsDead))
+            {
+                deadIds = new Dictionary<int, string>();
+                deadNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var nameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var r in _rows)
+                {
+                    var n = r.Summary?.LobbyName ?? r.Name;
+                    nameCounts.TryGetValue(n, out var c);
+                    nameCounts[n] = c + 1;
+                }
+                foreach (var r in _rows)
+                {
+                    if (!r.IsDead)
+                        continue;
+                    var id = r.Summary?.GamePlayerId ?? 0;
+                    var n = r.Summary?.LobbyName ?? r.Name;
+                    if (id > 0)
+                        deadIds[id] = n;
+                    if (nameCounts[n] == 1)
+                        deadNames.Add(n);
+                }
+            }
+
+            _lastSummaries = summaries;
+            _lastStatus = null;
+            StatusText.Visibility = Visibility.Collapsed;
+
+            // Duos grouping activates only once EVERY player's team is known (the
+            // team tags trickle in as heroes get revealed) — so the panel is either
+            // a clean list or perfect two-row bands, never a half-grouped mess.
+            if (summaries.Count > 0 && summaries.All(s => s.TeamId > 0))
+            {
+                // Teams ordered by their strongest member (direction follows the
+                // sort setting); both rows of a pair share one background, bands
+                // alternate per team.
+                var grouped = summaries.GroupBy(s => s.TeamId);
+                var teams = (_sortAscending
+                        ? grouped.OrderBy(g => g.Max(EffectiveRating))
+                        : grouped.OrderByDescending(g => g.Max(EffectiveRating)))
+                    .ToList();
+                var zebra = ThemeManager.Freeze(ThemeManager.Current.SubtleFill);
+                _rows = new List<LobbyRowVm>();
+                for (var i = 0; i < teams.Count; i++)
+                {
+                    foreach (var s in OrderByRating(teams[i]))
+                    {
+                        var vm = LobbyRowVm.From(s);
+                        if (i % 2 == 1)
+                            vm.RowBackground = zebra;
+                        _rows.Add(vm);
+                    }
+                }
+            }
+            else
+            {
+                // Solo: real ratings in the chosen direction, unknowns always last.
+                _rows = OrderByRating(summaries)
+                    .Select(LobbyRowVm.From)
+                    .ToList();
+            }
+            if (deadIds != null)
+            {
+                // Same agreement rules as UpdateLiveState: an id match must also
+                // agree on the name (duos id spaces can collide), and the name
+                // fallback speaks only while the name is unambiguous in BOTH
+                // rosters — a freshly-surfaced namesake must not inherit a skull.
+                var newNameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in _rows)
+                {
+                    var n = row.Summary?.LobbyName ?? row.Name;
+                    newNameCounts.TryGetValue(n, out var c);
+                    newNameCounts[n] = c + 1;
+                }
+                foreach (var row in _rows)
+                {
+                    var id = row.Summary?.GamePlayerId ?? 0;
+                    var n = row.Summary?.LobbyName ?? row.Name;
+                    var dead = (id > 0 && deadIds.TryGetValue(id, out var deadName) &&
+                                string.Equals(deadName, n, StringComparison.OrdinalIgnoreCase)) ||
+                               (deadNames.Contains(n) && newNameCounts[n] == 1);
+                    if (dead)
+                        row.IsDead = true;
+                }
+            }
+            RowsControl.ItemsSource = _rows;
+            UpdateLobbyContext(summaries);
+        }
+
+        private bool _hasLobbyContext;
+
+        /// <summary>Header summary: average lobby rating and your delta to it.</summary>
+        private void UpdateLobbyContext(IReadOnlyList<PlayerSummary> summaries)
+        {
+            // Players confirmed below the leaderboard cutoff count as 8000 — an upper
+            // bound, so the average is marked as approximate.
+            int? RatingOf(PlayerSummary s) =>
+                s.OnLeaderboard ? s.Rating : s.FallbackRating ?? (s.BelowCutoff ? 8000 : (int?)null);
+
+            var known = summaries.Select(RatingOf).Where(r => r != null).Select(r => r.Value).ToList();
+            if (known.Count < 2)
+            {
+                _hasLobbyContext = false;
+                HeaderContextText.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var approximate = summaries.Any(s => s.BelowCutoff);
+            var avg = (int)Math.Round(known.Average());
+            HeaderContextText.Inlines.Clear();
+            HeaderContextText.Inlines.Add(new System.Windows.Documents.Run(
+                $"avg {(approximate ? "~" : "")}{UiHelpers.FormatRating(avg)}"));
+            HeaderContextText.ToolTip = "Average lobby rating" + (approximate
+                ? " (players below the leaderboard cutoff are counted as 8 000)"
+                : "");
+
+            var local = summaries.FirstOrDefault(s => s.IsLocalPlayer);
+            var localRating = local != null ? RatingOf(local) : null;
+            // Outage state: the rows lose the chip column and get narrow, so the
+            // header would set the card's width — the delta is dropped to keep it
+            // compact (the average stays).
+            if (localRating != null && _walliiDownReason == null)
+            {
+                var delta = localRating.Value - avg;
+                HeaderContextText.Inlines.Add(new System.Windows.Documents.Run(" · "));
+                HeaderContextText.Inlines.Add(new System.Windows.Documents.Run(UiHelpers.FormatDelta(delta))
+                {
+                    Foreground = delta >= 0
+                        ? UiHelpers.PlacementBrush(2)
+                        : ThemeManager.Freeze(System.Windows.Media.Color.FromArgb(0xFF, 0xF8, 0x71, 0x71)),
+                    FontWeight = FontWeights.SemiBold,
+                });
+                HeaderContextText.ToolTip += " · your delta to it";
+            }
+            _hasLobbyContext = true;
+            if (!IsCollapsed)
+                HeaderContextText.Visibility = Visibility.Visible;
+        }
+
+        public void SetStatus(string message)
+        {
+            _lastStatus = message;
+            StatusText.Text = message;
+            StatusText.Visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        /// <summary>Updates dead/alive greying and picks up duos team ids as they appear.</summary>
+        public void UpdateLiveState(IReadOnlyList<LobbyPlayerInfo> players)
+        {
+            var teamsChanged = false;
+            // Lobby namesakes (same base name, different battletags) are told apart
+            // by the game player id when known; until then the k-th row of a name
+            // pairs with the k-th player of that name. The id must still agree on
+            // the name — ids from Power.log and hero entities live in different
+            // spaces in duos, and a bare id match could cross them.
+            var occurrence = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in _rows)
+            {
+                var name = row.Summary?.LobbyName ?? row.Name;
+                occurrence.TryGetValue(name, out var k);
+                occurrence[name] = k + 1;
+
+                var match = row.Summary != null && row.Summary.GamePlayerId > 0
+                    ? players.FirstOrDefault(p => p.PlayerId == row.Summary.GamePlayerId &&
+                        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                    : null;
+                if (match == null)
+                    match = players
+                        .Where(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                        .Skip(k)
+                        .FirstOrDefault();
+                if (match == null)
+                    continue;
+                if (row.Summary != null && match.PlayerId > 0)
+                    row.Summary.GamePlayerId = match.PlayerId;
+                row.IsDead = match.IsDead;
+                if (row.Summary != null && match.TeamId > 0 && row.Summary.TeamId != match.TeamId)
+                {
+                    row.Summary.TeamId = match.TeamId;
+                    teamsChanged = true;
+                }
+            }
+            // Team ids often surface a bit after the first render — regroup once known.
+            if (teamsChanged && _lastSummaries != null)
+                SetStats(_lastSummaries);
+        }
+
+        // --- window chrome ---
+
+        private void Row_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = (sender as FrameworkElement)?.Tag as LobbyRowVm;
+            if (vm?.Summary != null && vm.HasStats)
+                PlayerClicked?.Invoke(vm.Summary);
+        }
+
+        private void CollapseButton_Click(object sender, RoutedEventArgs e)
+        {
+            IsCollapsed = !_collapsed;
+            CollapsedChanged?.Invoke(_collapsed);
+        }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e) =>
+            SettingsRequested?.Invoke();
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragging = true;
+            _dragDistance = 0;
+            _dragStart = e.GetPosition(Parent as UIElement);
+            Header.CaptureMouse();
+        }
+
+        private void Header_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!_dragging)
+                return;
+            _dragging = false;
+            Header.ReleaseMouseCapture();
+            LayoutChanged?.Invoke();
+
+            // A click (not a drag) on the collapsed pill expands the panel.
+            if (_collapsed && _dragDistance < 4)
+            {
+                IsCollapsed = false;
+                CollapsedChanged?.Invoke(false);
+            }
+        }
+
+        private void Header_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (_dragging && e.LeftButton != MouseButtonState.Pressed)
+            {
+                _dragging = false;
+                Header.ReleaseMouseCapture();
+                LayoutChanged?.Invoke();
+            }
+        }
+
+        private void Header_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            // Capture can be force-released (e.g. the panel is hidden mid-drag);
+            // without this the panel would later glue itself to the cursor.
+            if (_dragging)
+            {
+                _dragging = false;
+                LayoutChanged?.Invoke();
+            }
+        }
+
+        private void Header_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_dragging)
+                return;
+            if (e.LeftButton != MouseButtonState.Pressed)
+            {
+                _dragging = false;
+                if (Header.IsMouseCaptured)
+                    Header.ReleaseMouseCapture();
+                return;
+            }
+            var parent = Parent as UIElement;
+            if (parent == null)
+                return;
+            var pos = e.GetPosition(parent);
+            var dx = pos.X - _dragStart.X;
+            var dy = pos.Y - _dragStart.Y;
+            _dragStart = pos;
+            _dragDistance += Math.Abs(dx) + Math.Abs(dy);
+
+            var left = Canvas.GetLeft(this);
+            var top = Canvas.GetTop(this);
+            if (double.IsNaN(left)) left = 0;
+            if (double.IsNaN(top)) top = 0;
+
+            var newLeft = left + dx;
+            var newTop = top + dy;
+            if (parent is FrameworkElement fe && fe.ActualWidth > 100)
+            {
+                newLeft = Math.Max(0, Math.Min(newLeft, fe.ActualWidth - 60));
+                newTop = Math.Max(0, Math.Min(newTop, fe.ActualHeight - 40));
+            }
+            Canvas.SetLeft(this, newLeft);
+            Canvas.SetTop(this, newTop);
+        }
+
+        private void Header_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            PanelScale = PanelScale + (e.Delta > 0 ? 0.1 : -0.1);
+            ScaleChangedByUser?.Invoke();
+            LayoutChanged?.Invoke();
+            e.Handled = true;
+        }
+    }
+}

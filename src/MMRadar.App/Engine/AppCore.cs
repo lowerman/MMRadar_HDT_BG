@@ -79,7 +79,7 @@ namespace MMRadar.Standalone
         }
         private WalliiService _wallii;
         private PluginSettings _settings;
-        private LobbyPanel _panel;
+        private OverlayPanel _panel;
         private DossierPopup _popup;
 
         /// <summary>
@@ -161,7 +161,7 @@ namespace MMRadar.Standalone
                     _settings.WalliiAnonKey),
                 new OfficialBoardClient(_settings.OfficialBoardUrl, dir));
 
-            _panel = new LobbyPanel { Visibility = System.Windows.Visibility.Collapsed };
+            _panel = new OverlayPanel { Visibility = System.Windows.Visibility.Collapsed };
             _popup = new DossierPopup { Visibility = System.Windows.Visibility.Collapsed };
             _settingsCard = new SettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending, SetChipStyle)
             {
@@ -981,11 +981,18 @@ namespace MMRadar.Standalone
                 return;
             try
             {
-                var width = _overlay.ActualWidth;
+                // Hearthstone renders in physical pixels, while WPF sizes the panel in
+                // DIPs that Windows display scaling (125%, 150%...) enlarges further.
+                // Size from the game's physical width, then undo the display scaling,
+                // so the panel covers the same share of the game on every PC.
+                var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(_overlay).DpiScaleX;
+                if (!(dpi > 0.1))
+                    dpi = 1.0;
+                var width = _overlay.ActualWidth * dpi;
                 if (width < 1000)
                     return; // overlay not sized to the game yet
                 var auto = 1.0 + (width / 1920.0 - 1.0) * 0.6;
-                auto = Math.Max(1.0, Math.Min(auto, 1.6));
+                auto = Math.Max(1.0, Math.Min(auto, 1.6)) / dpi;
                 if (Math.Abs(_panel.PanelScale - auto) < 0.01)
                     return;
                 _panel.PanelScale = auto;
