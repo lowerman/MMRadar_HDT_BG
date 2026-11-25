@@ -80,7 +80,13 @@ namespace MMRadar.Standalone
         private WalliiService _wallii;
         private PluginSettings _settings;
         private LobbyPanel _panel;
-        private PlayerDetailsPopup _popup;
+        private DossierPopup _popup;
+
+        /// <summary>
+        /// Games listed (and charted) in the dossier. Fixed for the app; fewer when
+        /// the player has fewer detectable games in the fetched history.
+        /// </summary>
+        private const int DossierGames = 30;
         private SettingsCard _settingsCard;
 
         private Phase _phase = Phase.Idle;
@@ -156,7 +162,7 @@ namespace MMRadar.Standalone
                 new OfficialBoardClient(_settings.OfficialBoardUrl, dir));
 
             _panel = new LobbyPanel { Visibility = System.Windows.Visibility.Collapsed };
-            _popup = new PlayerDetailsPopup { Visibility = System.Windows.Visibility.Collapsed };
+            _popup = new DossierPopup { Visibility = System.Windows.Visibility.Collapsed };
             _settingsCard = new SettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending, SetChipStyle)
             {
                 Visibility = System.Windows.Visibility.Collapsed,
@@ -608,7 +614,7 @@ namespace MMRadar.Standalone
                 PositionPopupNextToPanel();
                 _popup.ShowLoading(summary);
                 var details = await _wallii
-                    .GetPlayerDetailsAsync(summary, _lobby?.GameMode ?? "0", _settings.RecentGamesCount)
+                    .GetPlayerDetailsAsync(summary, _lobby?.GameMode ?? "0", DossierGames)
                     .ConfigureAwait(true);
                 if (generation != _popupGeneration)
                     return; // a newer click superseded this one
