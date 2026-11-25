@@ -101,7 +101,7 @@ Not affiliated with Blizzard Entertainment. Hearthstone is a trademark of Blizza
 
 ## Code signing policy
 
-See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md): how the app is built and signed, team roles, and the privacy policy.
+Windows release builds are produced by GitHub Actions and are being set up for free code signing by the [SignPath Foundation](https://signpath.org) (application in progress). See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md): how the app is built and signed, team roles, and the privacy policy.
 
 ## License
 
