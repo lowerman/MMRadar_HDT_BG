@@ -27,6 +27,7 @@ if ($Zip) {
         Copy-Item (Join-Path $out $f) $stage
     }
     Copy-Item (Join-Path $root "vendor\UnitySpy\LICENSE") (Join-Path $stage "THIRD-PARTY-LICENSE-UnitySpy.txt")
+    Copy-Item (Join-Path $PSScriptRoot "app-readme.txt") (Join-Path $stage "README.txt")
     $zipPath = Join-Path $out "MMRadar-v$version.zip"
     if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
     Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipPath
