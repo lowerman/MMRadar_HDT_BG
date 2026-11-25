@@ -201,8 +201,62 @@ namespace MMRadar.Standalone
             _overlay.Surface.Children.Add(_panel);
             _overlay.Surface.Children.Add(_popup);
             _overlay.Surface.Children.Add(_settingsCard);
+            AddCollapsedBeacon();
 
             Logger.Info("Overlay ready");
+        }
+
+        private System.Windows.Shapes.Ellipse _beacon;
+
+        /// <summary>
+        /// The collapsed pill fades to ~30% so it stays out of the way, but over
+        /// busy hero art it got hard to find. A full-brightness copy of the title
+        /// dot sits exactly on top of the real one while the panel is collapsed:
+        /// still barely noticeable, yet easy to spot when you know where to look.
+        /// It lives on the app's overlay, so the shared panel stays untouched.
+        /// </summary>
+        private void AddCollapsedBeacon()
+        {
+            _beacon = new System.Windows.Shapes.Ellipse
+            {
+                IsHitTestVisible = false, // clicks and hover go to the panel beneath
+                Visibility = System.Windows.Visibility.Collapsed,
+            };
+            Panel.SetZIndex(_beacon, 1000);
+            _overlay.Surface.Children.Add(_beacon);
+            _panel.LayoutUpdated += (s, e) => SyncCollapsedBeacon();
+            _panel.IsVisibleChanged += (s, e) => SyncCollapsedBeacon();
+        }
+
+        private void SyncCollapsedBeacon()
+        {
+            try
+            {
+                var dot = _panel.TitleDot;
+                var show = _panel.IsVisible && _panel.IsCollapsed && dot.IsVisible && dot.ActualWidth > 0;
+                var v = show ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                if (_beacon.Visibility != v)
+                    _beacon.Visibility = v;
+                if (!show)
+                    return;
+                var at = dot.TranslatePoint(new System.Windows.Point(0, 0), _overlay.Surface);
+                // Only touch properties that changed: every set re-runs layout,
+                // and this handler is driven by LayoutUpdated.
+                if (Math.Abs(Canvas.GetLeft(_beacon) - at.X) > 0.01 || double.IsNaN(Canvas.GetLeft(_beacon)))
+                    Canvas.SetLeft(_beacon, at.X);
+                if (Math.Abs(Canvas.GetTop(_beacon) - at.Y) > 0.01 || double.IsNaN(Canvas.GetTop(_beacon)))
+                    Canvas.SetTop(_beacon, at.Y);
+                if (_beacon.Width != dot.ActualWidth)
+                    _beacon.Width = dot.ActualWidth;
+                if (_beacon.Height != dot.ActualHeight)
+                    _beacon.Height = dot.ActualHeight;
+                if (!ReferenceEquals(_beacon.Fill, dot.Fill))
+                    _beacon.Fill = dot.Fill; // follows the theme and the coral "wallii down" state
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("Collapsed beacon: " + ex.Message);
+            }
         }
 
         public void Unload()
@@ -225,6 +279,8 @@ namespace MMRadar.Standalone
                     _overlay.Surface.Children.Remove(_panel);
                     _overlay.Surface.Children.Remove(_popup);
                     _overlay.Surface.Children.Remove(_settingsCard);
+                    if (_beacon != null)
+                        _overlay.Surface.Children.Remove(_beacon);
                 }
             }
             catch (Exception ex)
