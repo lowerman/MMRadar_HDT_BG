@@ -87,7 +87,7 @@ namespace MMRadar.Standalone
         /// the player has fewer detectable games in the fetched history.
         /// </summary>
         private const int DossierGames = 30;
-        private SettingsCard _settingsCard;
+        private OverlaySettingsCard _settingsCard;
 
         private Phase _phase = Phase.Idle;
         private LobbyState _lobby;
@@ -163,7 +163,7 @@ namespace MMRadar.Standalone
 
             _panel = new OverlayPanel { Visibility = System.Windows.Visibility.Collapsed };
             _popup = new DossierPopup { Visibility = System.Windows.Visibility.Collapsed };
-            _settingsCard = new SettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending, SetChipStyle)
+            _settingsCard = new OverlaySettingsCard(ToggleOverlay, ResetPosition, SetTheme, SetSortAscending, SetChipStyle)
             {
                 Visibility = System.Windows.Visibility.Collapsed,
             };
